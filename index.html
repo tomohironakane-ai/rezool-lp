@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タレントマネジメント | ROYAL</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Sans','Noto Sans JP','Meiryo',sans-serif;background:#f1f5f9;min-height:100vh}
+input,select,textarea{font-family:inherit}
+button{font-family:inherit;cursor:pointer}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#f1f5f9}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect} = React;
+
+// ============================================================
+// MASTER DATA
+// ============================================================
+const DEPARTMENTS = ["国際部","直営店舗","直営営業チーム","直営オペレーション","法人開発部","管理本部","ロジスティックス"];
+const DEPT_COLORS = {"国際部":"#6366f1","直営店舗":"#f59e0b","直営営業チーム":"#22c55e","直営オペレーション":"#3b82f6","法人開発部":"#8b5cf6","管理本部":"#64748b","ロジスティックス":"#f97316"};
+const COMPETENCE_ITEMS = [
+  {no:1,cat:"基本",name:"ルール遵守",desc:"会社のルールや規則を理解し守っていますか？他者と決めた約束や期限は守れていますか？相手から信頼されていますか？"},
+  {no:2,cat:"基本",name:"マナー意識",desc:"社会人としてのマナーを持っていますか？挨拶も含めて礼儀正しく、清潔に、笑顔をもって、誰とでも応対できていますか？"},
+  {no:3,cat:"基本",name:"継続力",desc:"たとえすぐに報われないとわかっていても地道な努力を続けられていますか？やると決めた事は諦めずに取り組み続けることができますか？"},
+  {no:4,cat:"基本",name:"感情管理",desc:"感情に振り回されず、ムラなく仕事に取り組んでいますか？休みの日はストレス解消に取り組み、仕事時間においてはパフォーマンスを発揮できるように心がけていますか？"},
+  {no:5,cat:"基本",name:"成長意欲",desc:"先輩や上司から素直に学び、失敗からも学び、次の仕事に活かしていますか？それ以外にも自分自身を高めるための勉強はしていますか？"},
+  {no:6,cat:"基本",name:"基本知識・スキル",desc:"今の部門・職位で求められる業務知識やスキル（Excelなど）は有していますか？マニュアルや研修などが無くとも自発的に知識を得ていますか？"},
+  {no:7,cat:"基本",name:"情報収集",desc:"必要な情報を多方面から入手できていますか？事実なのか意見なのかを区別できていますか？得られた情報を客観的に整理できていますか？"},
+  {no:8,cat:"基本",name:"カスタマー理解",desc:"顧客満足度（取引先含む）を考え、理解し、期待以上のものを提供しようとしていますか？顧客の事をきちんと理解していますか？顧客満足度向上のためのフォローも行っていますか？"},
+  {no:9,cat:"基本",name:"伝達力",desc:"自分が伝えたい事を簡潔にまとめて相手にわかりやすく伝えていますか？結論から先に述べ、その後に理由を伝える事はできますか？報連相はきちんとできていますか？"},
+  {no:10,cat:"コアバリュー",name:"スピード (Fast)",desc:"自身の生産性やスピードを意識して仕事していますか？顧客や仲間が求める期日を守って動けていますか？もらった連絡に関してはタイムリーに対応できていますか？"},
+  {no:11,cat:"コアバリュー",name:"信頼 (Faith)",desc:"仕事の成果物は顧客や仲間からも信頼にたるものですか？品質が高い成果物ですか？ミスがないようにきちんとチェックしていますか？あなたは取引先や同僚からきちんと信頼されていますか？"},
+  {no:12,cat:"コアバリュー",name:"誠実・公正 (Fair)",desc:"誰に対しても誠実で公平な態度を取っていますか？間違いをしたら隠す事なく素直に謝罪し、何かをしてもらったらお礼を言っていますか？嘘やごまかし、陰口などはしていませんか？"},
+  {no:13,cat:"コアバリュー",name:"ポジティブマインド (Fun!)",desc:"物事をポジティブに捉えられていますか？悲観的になりすぎていませんか？あなたはポジティブな人間と認知されていますか？まわりと笑顔で会話をしていますか？"},
+  {no:14,cat:"3つのC",name:"協調 (Cooperation)",desc:"周囲に協力し困っている人を助けていますか？自分の仕事が終わっても仕事が残っている人に「手伝いますか？」と言えていますか？自分が困っている時は周囲に助けを求めていますか？"},
+  {no:15,cat:"3つのC",name:"育成 (Coaching)",desc:"後輩やアルバイトスタッフなどにきちんと教える事ができていますか？自分の部下でなくとも声をかけるなどしてあげられていますか？抽象的な事ではなく具体的に教えてあげられていますか？"},
+  {no:16,cat:"3つのC",name:"文化創出 (Culture building)",desc:"チームにおいて「良いカルチャー」を構築する事に貢献出来ていますか？ネガティブな面や元気の無さを出してチームに悪影響を出していませんか？"},
+  {no:17,cat:"上位スキル",name:"主体性",desc:"自ら考えて主体的な行動を起こせていますか？指示を待たず「こうしたいのですが良いですか？」と上司に確認を取っていますか？担当外でも積極的に仕事を受けていますか？"},
+  {no:18,cat:"上位スキル",name:"柔軟性",desc:"環境や時代の変化に対して前向きに適応できていますか？新しい考えを積極的に歓迎し、受け入れていますか？他者の意見も受け入れ、自身の考えや行動を変化させていますか？"},
+  {no:19,cat:"上位スキル",name:"変化への受容",desc:"幅広い事に興味をもって物事を捉えていますか？新しい考えを前向きに受け入れ、発展させることができますか？"},
+  {no:20,cat:"上位スキル",name:"共感力・異なる価値観の受容",desc:"立場や価値観の異なる相手の話をしっかり聞いて理解し受容出来ていますか？その話を踏まえて自らの考えを発展させる事ができていますか？自分の考えに固執していませんか？"},
+  {no:21,cat:"上位スキル",name:"専門性（スペシャリティ）",desc:"あなたは何かの専門家ですか？人に負けない分野がありますか？社内で特定の領域の専門家として認識されていますか？自分の専門性を高める努力をしていますか？"},
+  {no:22,cat:"上位スキル",name:"広範さ（ジェネラリティ）",desc:"あなたは幅広い分野で活躍していますか？自分の業務範囲を広げるべく積極的に手を挙げていますか？幅広い視野で仕事に取り組めていますか？"},
+  {no:23,cat:"上位スキル",name:"横断コミュニケーション",desc:"自ら積極的にコミュニケーションをしていますか？自分のチームだけでなく他の職種・部門の人ともコミュニケーションを取っていますか？会社においてあなたはリーダーの一人として認知されていますか？"},
+  {no:24,cat:"上位スキル",name:"判断力",desc:"定量的なデータや調査に基づいて、数値感覚ももって、適正な判断ができていますか？テンプレートをただ使用するのではなく自らの頭で常に考えられていますか？"},
+  {no:25,cat:"マネジメント",name:"状況把握",desc:"市場環境や会社戦略の中で自身やチームがどのような立ち位置にいるのか、その上で何をすべきか客観的に捉えられていますか？"},
+  {no:26,cat:"マネジメント",name:"問題分析",desc:"幅広い定量的なデータ分析や調査を通じ、事実関係を踏まえた上で、問題の原因や本質を客観的に捉える事ができていますか？"},
+  {no:27,cat:"マネジメント",name:"人材育成",desc:"各メンバーのキャリアビジョン、またそれに向けた課題などを正確に把握していますか？弱点・改善点を適宜フィードバックして受容させていますか？自らの背中でもってチームメンバーを正しく導いていますか？"},
+  {no:28,cat:"マネジメント",name:"動機付け",desc:"周囲に仕事の目的を伝え、チーム全体のやる気を高められていますか？メンバーへの気遣い・ケアはできていますか？自分の力ではなくチーム全体の力で成果を出していますか？"},
+  {no:29,cat:"マネジメント",name:"目標設定",desc:"会社のビジョンや戦略を理解した上でそれに沿った目標を設定していますか？定量化含めて達成基準が明確な目標ですか？メンバーへその目標を落とし込めていますか？"},
+  {no:30,cat:"マネジメント",name:"企画提案",desc:"目的や具体策含め、企画や提案を積極的にできていますか？他人のアイデアもすぐに否定せず積極的に取り入れて発展させられていますか？"},
+  {no:31,cat:"マネジメント",name:"解決案の提示",desc:"複数の選択肢を提示し、メリットやデメリットの整理ができますか？その上で合理的に最善な選択肢を提言できますか？"},
+  {no:32,cat:"マネジメント",name:"目標達成 (コミットメント)",desc:"チームの売上利益、またはそれに直結する定量的な目標の達成にコミットしていますか？プランAでダメだった場合はプランBで挑戦し、目標達成のための様々な手段を講じていますか？"},
+  {no:33,cat:"上級マネジメント",name:"計画立案",desc:"目標達成に向けて5W1Hが明確、かつ遅延リスクも踏まえた現実的な計画を立案し、メンバーに共有し、進捗管理をしながら実行できていますか？問題が大きくなる前に共有できていますか？"},
+  {no:34,cat:"上級マネジメント",name:"進捗管理",desc:"進捗管理のためのマイルストーンは設置していますか？マイルストーン毎に現実と計画のギャップを把握していますか？目標達成のために計画修正ができていますか？"},
+  {no:35,cat:"上級マネジメント",name:"ムダの改善",desc:"あらゆるムダを排除し、チーム全体が効率良く仕事を進められていますか？業務やシステムの見直しを主体的かつ継続的に取り組んでいますか？"},
+  {no:36,cat:"上級マネジメント",name:"プロフィット",desc:"売上・原価・経費を把握していますか？売上を上げる、利益を上げるためにはどうすべきか考え実行していますか？市場や競合の動きも理解し、売上や利益を上げる策を講じていますか？"},
+  {no:37,cat:"エグゼクティブ",name:"組織運営",desc:"様々な経験・背景・職種・職位の気持ちを理解していますか？様々なメンバーから成立するチームを全体的な視点で運営していますか？組織内で問題が起きたら的確に対応できていますか？"},
+  {no:38,cat:"エグゼクティブ",name:"人材発掘・活用",desc:"人材の中から優れた人材を見つけ出し機会を与えていますか？メンバーからアイデアを引き出し実現を支援していますか？社外の優れた人間を惹きつけて人材登用はしていますか？"},
+  {no:39,cat:"エグゼクティブ",name:"業務委任",desc:"部下の誰に何をどこまで任せられるか、一人一人の能力を勘案した業務委任ができていますか？成長機会は与えられていますか？失敗した時には速やかにフォローし問題解決できていますか？"},
+  {no:40,cat:"エグゼクティブ",name:"影響力 (人脈)",desc:"社内での影響力を持っていますか？取引先のキーパーソンを把握し、信頼関係を構築できていますか？社外の人的ネットワークを築いて（人脈）ビジネスを構築できていますか？"},
+  {no:41,cat:"エグゼクティブ",name:"理念浸透",desc:"会社の価値観を自分の言葉で語って行動指針を自ら体現していますか？チームに対して価値観を熱量をもって伝えて受容させられていますか？"},
+  {no:42,cat:"エグゼクティブ",name:"戦略策定",desc:"ビジョンに向かって戦略を策定できますか？そのためには何を優先し、何を優先すべきでないかも理解していますか？その優先順位に沿った判断ができますか？"},
+  {no:43,cat:"エグゼクティブ",name:"創造性",desc:"新しいアイデアを発案し具現化していますか？従来の方法や固定概念に囚われず目標か目的に向かって新たな解決策を生み出せていますか？"},
+  {no:44,cat:"エグゼクティブ",name:"変革力",desc:"慣例に縛られず過去を否定する事ができますか？常に前向きな危機感を持って、新たな考えを生み出せますか？変革を実行する実行力はありますか？"},
+  {no:45,cat:"エグゼクティブ",name:"説得力",desc:"単に自分の主張をするのではなく、双方にとってwin-winとなる案を提示し、合意形成をする事ができますか？"},
+  {no:46,cat:"エグゼクティブ",name:"決断力",desc:"最低限の情報であっても様々な選択肢を深く検討し、決断をする事ができますか？その決断に際して責任を負う覚悟も持っていますか？"},
+  {no:47,cat:"エグゼクティブ",name:"ビジョン",desc:"市場の動向や会社のビジョンを踏まえ自部門のあるべき姿を描く事ができますか？会社全体のビジョンに対しても具体的な意見を提示し、ビジョンの構築と浸透に寄与できていますか？"},
+  {no:48,cat:"エグゼクティブ",name:"信念 (ポリシー)",desc:"自分が正しいと思った事は信念をもって語っていますか？貫けますか？その信念は客観的な事実や情報にも基づいているものですか？"},
+  {no:49,cat:"エグゼクティブ",name:"経営陣意識",desc:"経営陣の一人として会社全体の売上利益、また組織全体に対してコミットしていますか？それらを向上させるための包括的かつ継続的な実行はできていますか？代表不在時は自らが代表の一人として組織を担う覚悟・意識はありますか？"},
+];
+const POSITIONS = ["JME","ME","SME","ASL","TL","STL","ASM","MA","SMA","GM","SGM","ADI","DI","SDI","EDI"];
+const POSITION_NAMES = {JME:"ジュニアメンバー",ME:"メンバー",SME:"シニアメンバー",ASL:"アソシエイトリーダー",TL:"チームリーダー",STL:"シニアリーダー",ASM:"アソシエイトマネージャー",MA:"マネージャー",SMA:"シニアマネージャー",GM:"ゼネラルマネージャー",SGM:"シニアGM",ADI:"アソシエイトディレクター",DI:"ディレクター",SDI:"シニアディレクター",EDI:"エグゼクティブディレクター"};
+const GRADE_COLORS = {S:"#f59e0b",A:"#22c55e","A-":"#34d399",B:"#3b82f6",C:"#f97316",D:"#ef4444",F:"#7f1d1d"};
+const SCORE_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#6366f1"];
+const STORAGE_KEY = "talent_mgmt_royal_v2";
+
+// 評価データ構造:
+//   grade        = 本人評価グレード
+//   managerGrade = 上司評価グレード
+//   managerComp  = 上司コンピテンス評価
+//   managerComment = 上司コメント
+//   nextPosition = 上司推薦次期職位
+//   nakaneGrade  = 中根最終評価グレード 
+//   nakaneComp   = 中根コンピテンス修正（空欄は上司値を採用）
+//   nakaneComment = 中根コメント
+//   nakaneNextPos = 中根推薦次期職位 
+
+const SAMPLE = [
+  {id:"001",name:"田中 一郎",department:"法人開発部",position:"TL",joinDate:"2020-04-01",email:"tanaka@royal.co.jp",role:"シニアセールス",
+   evaluations:[
+    {period:"2024上期",grade:"A",managerGrade:"A",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"新規法人顧客5社獲得・売上前期比+20%",qcd:"提案書標準化で品質向上",team:"新人2名の商談同行支援",ai:"顧客分析AIツール活用で提案精度向上"},
+     selfComp:{1:4,2:4,3:5,4:4,5:5,6:4,7:4,8:5,9:4,10:5,11:5,12:4,13:5,14:4,15:4,16:4,17:4,18:4,19:4,20:4,21:4,22:4,23:4,24:4},
+     managerComp:{1:4,2:4,3:4,4:4,5:5,6:4,7:4,8:5,9:4,10:5,11:5,12:4,13:5,14:4,15:3,16:4,17:4,18:4,19:3,20:4,21:4,22:4,23:3,24:4},
+     managerComment:"法人営業で圧倒的な成果。STL昇格を推薦。",nextPosition:"STL",
+     nakaneGrade:"A",nakaneComp:{},nakaneComment:"",nakaneNextPos:"STL"},
+    {period:"2023下期",grade:"A-",managerGrade:"A-",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"既存顧客リニューアル3件・売上前期比+8%",qcd:"提案書フォーマット作成",team:"新人1名OJT担当",ai:"ChatGPT活用でメール作成効率化"},
+     selfComp:{1:4,2:3,3:4,4:3,5:4,6:4,7:4,8:4,9:4,10:4,11:4,12:4,13:4,14:3,15:3,16:3,17:3,18:3,19:3,20:3,21:3,22:3,23:3,24:3},
+     managerComp:{1:4,2:3,3:4,4:3,5:4,6:4,7:3,8:4,9:4,10:4,11:4,12:4,13:4,14:3,15:3,16:3,17:3,18:3,19:3,20:3,21:3,22:3,23:3,24:3},
+     managerComment:"安定した成果。もう一段上を目指してほしい。",nextPosition:"TL",
+     nakaneGrade:"A-",nakaneComp:{},nakaneComment:"",nakaneNextPos:"TL"},
+    {period:"2023上期",grade:"B",managerGrade:"B",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"新規顧客2社獲得",qcd:"業務マニュアル更新",team:"部内勉強会1回開催",ai:"未活用"},
+     selfComp:{1:3,2:3,3:3,4:3,5:4,6:3,7:3,8:3,9:3,10:3,11:3,12:3,13:4,14:3,15:3,16:3},
+     managerComp:{1:3,2:3,3:3,4:3,5:4,6:3,7:3,8:3,9:3,10:3,11:3,12:3,13:3,14:3,15:3,16:3},
+     managerComment:"基礎は固まってきた。積極性をもっと発揮してほしい。",nextPosition:"TL",
+     nakaneGrade:"B",nakaneComp:{},nakaneComment:"",nakaneNextPos:"TL"},
+   ],
+   resume:{education:"○○大学 経済学部 (2020年3月)",certifications:["宅地建物取引士"],skills:["法人営業","提案書作成","Salesforce"]}},
+  {id:"002",name:"佐藤 花子",department:"直営店舗",position:"ASM",joinDate:"2019-04-01",email:"sato@royal.co.jp",role:"ストアマネージャー",
+   evaluations:[{period:"2024上期",grade:"S",managerGrade:"S",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"店舗売上目標130%達成・顧客満足度社内1位",qcd:"在庫管理システム刷新でロス率40%削減",team:"スタッフ教育プログラム構築・離職率ゼロ達成",ai:"AIシフト管理ツール導入で人件費最適化"},
+     selfComp:{1:5,2:5,3:5,4:5,5:5,6:5,7:5,8:5,9:5,10:5,11:5,12:5,13:5,14:5,15:5,16:5,17:5,18:5,19:5,20:5,21:4,22:5,23:5,24:5,25:4,26:4,27:5,28:5,29:5,30:5,31:5,32:5},
+     managerComp:{1:5,2:5,3:5,4:5,5:5,6:5,7:5,8:5,9:5,10:5,11:5,12:5,13:5,14:5,15:5,16:5,17:5,18:5,19:5,20:5,21:4,22:5,23:5,24:5,25:5,26:5,27:5,28:5,29:5,30:5,31:5,32:5},
+     managerComment:"全部門トップの成果。MA昇格を強く推薦。",nextPosition:"MA",
+     nakaneGrade:"S",nakaneComp:{},nakaneComment:"",nakaneNextPos:"MA"}],
+   resume:{education:"△△大学 経営学部 (2019年3月)",certifications:["販売士1級","中小企業診断士"],skills:["店舗運営","在庫管理","スタッフ育成","POS分析"]}},
+  {id:"003",name:"山田 次郎",department:"ロジスティックス",position:"SME",joinDate:"2022-04-01",email:"yamada@royal.co.jp",role:"物流コーディネーター",
+   evaluations:[{period:"2024上期",grade:"B",managerGrade:"B",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"配送コスト5%削減達成",qcd:"誤出荷率ゼロ達成（3ヶ月連続）",team:"倉庫スタッフ朝礼ファシリテーター担当",ai:"配送ルート最適化AIを試験運用"},
+     selfComp:{1:3,2:4,3:3,4:3,5:4,6:4,7:3,8:3,9:3,10:3,11:4,12:3,13:4,14:3,15:3,16:3},
+     managerComp:{1:4,2:3,3:3,4:3,5:3,6:4,7:3,8:3,9:3,10:3,11:4,12:3,13:3,14:3,15:3,16:3},
+     managerComment:"基礎業務は安定。自発的な改善提案を期待。",nextPosition:"ASL",
+     nakaneGrade:"B",nakaneComp:{},nakaneComment:"",nakaneNextPos:"ASL"}],
+   resume:{education:"□□大学 商学部 (2022年3月)",certifications:["フォークリフト運転技能","危険物取扱者乙4"],skills:["在庫管理","WMS操作","配送管理"]}},
+  {id:"004",name:"鈴木 美咲",department:"管理本部",position:"ME",joinDate:"2023-04-01",email:"suzuki@royal.co.jp",role:"経理担当",
+   evaluations:[{period:"2024上期",grade:"A-",managerGrade:"A-",specialSkillSelf:null,specialSkillManager:null,
+     achievements:{sales:"月次決算の1日前倒し達成",qcd:"経費精算エラー率ゼロ（半期）",team:"新入社員への経理研修担当",ai:"ChatGPT活用で定型業務30%効率化"},
+     selfComp:{1:4,2:4,3:4,4:3,5:4,6:4,7:4,8:3,9:4,10:4,11:4,12:4,13:4,14:3,15:3,16:3},
+     managerComp:{1:4,2:4,3:4,4:4,5:4,6:5,7:4,8:3,9:4,10:4,11:4,12:4,13:4,14:3,15:3,16:3},
+     managerComment:"着実な成長。コミュニケーション面をさらに伸ばしてほしい。",nextPosition:"SME",
+     nakaneGrade:"A-",nakaneComp:{},nakaneComment:"",nakaneNextPos:"SME"}],
+   resume:{education:"◇◇大学 会計学科 (2023年3月)",certifications:["日商簿記2級"],skills:["Excel","freee","経費精算","月次決算"]}},
+];
+
+// 最終有効グレード（中根 > 上司 の優先順位）
+function effGrade(ev){ if(!ev)return ""; return ev.nakaneGrade||ev.managerGrade||ev.grade||""; }
+function effNextPos(ev){ if(!ev)return ""; return ev.nakaneNextPos||ev.nextPosition||""; }
+
+// ============================================================
+// EXCEL PARSER
+// ============================================================
+function parseCompRow(row){
+  let self=null,manager=null;
+  for(let i=0;i<5;i++){
+    const val=String(row[5+i]||"").trim();
+    if(!val)continue;
+    const score=i+1;
+    if(val==="○"||val==="◯"||val==="〇")self=score;
+    else if(val==="●"||val==="◉"||val==="⚫")manager=score;
+    else if(/^[1-5]$/.test(val))self=score;
+  }
+  return{self,manager};
+}
+function parseEvalSheet(ws){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+  const g=(r,c)=>String((rows[r]||[])[c]||"").trim();
+
+  // 氏名: B2(index=1), 職位: B3(index=1)
+  const name=g(1,1);
+  const position=g(2,1);
+
+  // 成果評価: E列(index=4) 行6〜9(rows[5〜8])
+  const sales=g(5,4);
+  const qcd=g(6,4);
+  const team=g(7,4);
+  const ai=g(8,4);
+
+  // 専門スキル: B列(index=1) 行13〜19
+  let ssS=null,ssM=null;
+  for(let i=12;i<=18;i++){
+    const val=String((rows[i]||[])[1]||"").trim();
+    if(!val)continue;
+    const lv=i-11;
+    if(val==="○"||val==="◯"||val==="〇")ssS=lv;
+    else if(val==="●"||val==="◉")ssM=lv;
+    else if(/^[1-7]$/.test(val))ssS=parseInt(val);
+  }
+
+  // コンピテンス: 行23〜71(rows[22〜70])
+  // col6=index5=1点, col7=index6=2点, col8=index7=3点, col9=index8=4点, col10=index9=5点
+  // ○=本人, ●=上司
+  const sc={},mc={};
+  for(let i=22;i<=70;i++){
+    const row=rows[i]||[];
+    const no=Number(row[0]);
+    if(!no||isNaN(no)||no<1||no>49)continue;
+    for(let ci=0;ci<5;ci++){
+      const val=String(row[5+ci]||"").trim();
+      if(!val)continue;
+      const score=ci+1;
+      if(val==="○"||val==="◯"||val==="〇")sc[no]=score;
+      else if(val==="●"||val==="◉"||val==="⚫")mc[no]=score;
+    }
+  }
+
+  // 総合評価グレード: E74(index=4) → '(S)' '(A-)' '(B)' 形式
+  // C74はテンプレ説明文のため除外、E列(index=4)を優先
+  let grade="";
+  const gr=rows[73]||[];
+  // グレード正規化関数（全角→半角、カッコ除去）
+  const normalizeGrade=v=>{
+    if(!v)return "";
+    // 全角英数→半角、全角カッコ→半角カッコ
+    let s=v.replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+           .replace(/（/g,"(").replace(/）/g,")")
+           .trim();
+    // (S) (A-) (A) (B) (C) (D) (F) またはそのまま S A- A B C D F
+    const m=s.match(/^\(?\s*(S|A-|A|B|C|D|F)\s*\)?$/i);
+    return m?m[1].toUpperCase():"";
+  };
+  // E74(index=4)を優先確認
+  const e74=String(gr[4]||"").trim();
+  grade=normalizeGrade(e74);
+  // E74が空なら全列スキャン（C74=idx2,D74=idx3はテンプレなのでスキップ）
+  if(!grade){
+    const TSKIP=["Super","GREAT","職位UP","職位KEEP","妥当","半年間","続いたら","踏まえたら","記入欄"];
+    for(let c=0;c<=10;c++){
+      if(c===2||c===3)continue;
+      const v=String(gr[c]||"").trim();
+      if(!v||TSKIP.some(t=>v.includes(t)))continue;
+      const ng=normalizeGrade(v);
+      if(ng){grade=ng;break;}
+    }
+  }
+
+  // 上司コメント: E75(index=4)
+  let managerComment="";
+  const cr=rows[74]||[];
+  const e75=String(cr[4]||"").trim();
+  if(e75){
+    managerComment=e75;
+  } else {
+    // E75になければ全列スキャン
+    const CSKIP=["総合評価の理由","上長記入欄","何が良くて","改善点をわかる"];
+    for(let c=0;c<=10;c++){
+      if(c===2||c===3)continue;
+      const v=String(cr[c]||"").trim();
+      if(!v)continue;
+      if(CSKIP.some(t=>v.includes(t)))continue;
+      managerComment=v;break;
+    }
+  }
+
+  // 次の職位: C76(index=2) または E76(index=4)
+  let nextPosition="";
+  const nr=rows[75]||[];
+  for(let c=4;c>=2;c--){
+    const v=String(nr[c]||"").trim();
+    if(v&&!v.includes("記入欄")){nextPosition=v;break;}
+  }
+
+  return{name,position,sales,qcd,team,ai,
+    specialSkillSelf:ssS,specialSkillManager:ssM,
+    selfComp:sc,managerComp:mc,
+    grade,managerComment,nextPosition};
+}
+
+// ============================================================
+// EXCEL EXPORT
+// ============================================================
+function exportToExcel(employees){
+  const wb=XLSX.utils.book_new();
+  const ld=[["氏名","部署","職位","職位名","入社日","メール","役職","期間","本人評価","上司評価","中根最終評価","上司推薦職位","中根最終職位","上司コメント","中根コメント"]];
+  employees.forEach(emp=>{const ev=emp.evaluations[0];ld.push([emp.name,emp.department,emp.position,POSITION_NAMES[emp.position]||"",emp.joinDate,emp.email,emp.role,ev?.period||"",ev?.grade||"",ev?.managerGrade||"",effGrade(ev),ev?.nextPosition||"",effNextPos(ev),ev?.managerComment||"",ev?.nakaneComment||""]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ld),"社員一覧");
+  const ad=[["氏名","部署","職位","期間","本人評価","上司評価","中根最終評価","売上利益","QCD成果","チーム成果","AI活用"]];
+  employees.forEach(emp=>{emp.evaluations.forEach(ev=>{ad.push([emp.name,emp.department,emp.position,ev.period,ev.grade||"",ev.managerGrade||"",effGrade(ev),ev.achievements?.sales||"",ev.achievements?.qcd||"",ev.achievements?.team||"",ev.achievements?.ai||""]);});});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ad),"成果評価");
+  const ch=["氏名","部署","職位","期間","中根最終評価",...COMPETENCE_ITEMS.map(i=>"No."+i.no+" "+i.name+"(本)"),...COMPETENCE_ITEMS.map(i=>"No."+i.no+" "+i.name+"(上司)"),...COMPETENCE_ITEMS.map(i=>"No."+i.no+" "+i.name+"(中根)")];
+  const cd=[ch];
+  employees.forEach(emp=>{emp.evaluations.forEach(ev=>{const row=[emp.name,emp.department,emp.position,ev.period,effGrade(ev)];COMPETENCE_ITEMS.forEach(item=>row.push(ev.selfComp?.[item.no]||""));COMPETENCE_ITEMS.forEach(item=>row.push(ev.managerComp?.[item.no]||""));COMPETENCE_ITEMS.forEach(item=>row.push(ev.nakaneComp?.[item.no]||""));cd.push(row);});});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cd),"コンピテンス");
+  const ds=[["部署","人数","S","A","A-","B","C","D","平均コンピテンス(上司)"]];
+  DEPARTMENTS.forEach(dept=>{const emps=employees.filter(e=>e.department===dept);const gc={};emps.forEach(e=>{const g=effGrade(e.evaluations[0]);if(g)gc[g]=(gc[g]||0)+1;});const vals=[];emps.forEach(e=>{const ev=e.evaluations[0];if(ev?.managerComp)Object.values(ev.managerComp).forEach(v=>vals.push(v));});const avg=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):"";ds.push([dept,emps.length,gc.S||0,gc.A||0,gc["A-"]||0,gc.B||0,gc.C||0,gc.D||0,avg]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ds),"部署別集計");
+  XLSX.writeFile(wb,"talent_management_"+new Date().toISOString().split("T")[0]+".xlsx");
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+const LS={fontSize:"0.75rem",color:"#64748b",display:"block",marginBottom:4,fontWeight:600};
+const IS={width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"7px 10px",boxSizing:"border-box",fontSize:"0.85rem"};
+const NLS={fontSize:"0.75rem",color:"#92400e",display:"block",marginBottom:4,fontWeight:700};
+const NIS={width:"100%",border:"1.5px solid #f59e0b",borderRadius:8,padding:"7px 10px",boxSizing:"border-box",fontSize:"0.85rem",background:"#fffbeb"};
+
+function GB({grade,nakane}){
+  if(!grade)return null;
+  return <span style={{background:GRADE_COLORS[grade]||"#94a3b8",color:"#fff",borderRadius:6,padding:"2px 10px",fontWeight:800,fontSize:"0.82rem",boxShadow:nakane?"0 0 0 2px #f59e0b":"none"}}>
+    {grade}{nakane&&<span style={{fontSize:"0.6rem",marginLeft:3,opacity:.9}}>★</span>}
+  </span>;
+}
+function GBL({grade,nakane}){
+  if(!grade)return null;
+  return <span style={{background:GRADE_COLORS[grade]||"#94a3b8",color:"#fff",borderRadius:6,padding:"4px 16px",fontWeight:800,fontSize:"1.05rem",boxShadow:nakane?"0 0 0 2px #f59e0b,0 0 0 4px #fef3c7":"none"}}>{grade}</span>;
+}
+function DTag({dept}){return <span style={{background:(DEPT_COLORS[dept]||"#94a3b8")+"22",color:DEPT_COLORS[dept]||"#64748b",border:"1px solid "+((DEPT_COLORS[dept]||"#94a3b8")+"44"),borderRadius:20,padding:"2px 10px",fontSize:"0.72rem",fontWeight:700}}>{dept}</span>;}
+function GSel({value,onChange,gold}){
+  return <select value={value} onChange={e=>onChange(e.target.value)} style={{...IS,fontWeight:700,background:gold?"#fffbeb":"#fff",border:gold?"1.5px solid #f59e0b":IS.border}}>
+    <option value="">-</option>{["S","A","A-","B","C","D","F"].map(g=><option key={g} value={g}>{g}</option>)}
+  </select>;
+}
+function SSel({value,onChange,color}){
+  return <select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid "+(value?color:"#e2e8f0"),borderRadius:6,padding:"4px 6px",fontSize:"0.8rem",background:value?"#fafbff":"#fff",color:value?color:"#94a3b8",fontWeight:value?700:400}}>
+    <option value="">-</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
+  </select>;
+}
+
+function ScoreBar({self,manager,nakane}){
+  const rows=[];
+  if(self!=null)rows.push({lbl:"本",v:self,c:"#6366f1"});
+  if(manager!=null)rows.push({lbl:"上",v:manager,c:"#dc2626"});
+  if(nakane!=null)rows.push({lbl:"中",v:nakane,c:"#f59e0b"});
+  if(rows.length===0)return <span style={{color:"#e2e8f0",fontSize:"0.75rem"}}>—</span>;
+  return <div style={{display:"flex",flexDirection:"column",gap:2}}>
+    {rows.map((r,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
+      <span style={{fontSize:"0.6rem",color:r.c,minWidth:14,textAlign:"right"}}>{r.lbl}</span>
+      <div style={{flex:1,background:"#f1f5f9",borderRadius:3,height:5,overflow:"hidden"}}><div style={{width:((r.v/5)*100)+"%",height:"100%",background:r.c,borderRadius:3}}/></div>
+      <span style={{fontSize:"0.7rem",color:r.c,minWidth:8,fontWeight:700}}>{r.v}</span>
+    </div>)}
+  </div>;
+}
+
+
+
+// ============================================================
+// HISTORY TAB — 評価履歴・成長トレンド・期間比較
+// ============================================================
+const GRADE_NUM = {S:6,A:5,"A-":4,B:3,C:2,D:1,F:0};
+const GRADE_ORDER = ["S","A","A-","B","C","D","F"];
+
+function GradeArrow({prev,curr}){
+  if(!prev||!curr)return null;
+  const diff=GRADE_NUM[curr]-GRADE_NUM[prev];
+  if(diff>0)return <span style={{color:"#22c55e",fontWeight:800,fontSize:"0.85rem"}}>▲ UP</span>;
+  if(diff<0)return <span style={{color:"#ef4444",fontWeight:800,fontSize:"0.85rem"}}>▼ DOWN</span>;
+  return <span style={{color:"#94a3b8",fontSize:"0.85rem"}}>― KEEP</span>;
+}
+
+function TrendChart({evaluations}){
+  // 古い順に並べる
+  const sorted=[...evaluations].reverse();
+  if(sorted.length<1)return null;
+  const W=480,H=100,PAD={t:12,b:36,l:20,r:20};
+  const chartW=W-PAD.l-PAD.r;
+  const chartH=H-PAD.t-PAD.b;
+  const grades=sorted.map(ev=>GRADE_NUM[effGrade(ev)]||0);
+  const xStep=sorted.length>1?chartW/(sorted.length-1):0;
+  const yOf=v=>(PAD.t+chartH)-((v/6)*chartH);
+  const points=grades.map((g,i)=>[(PAD.l+(i*xStep)),yOf(g)]);
+  const pathD=points.map((p,i)=>(i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  // グレード横線
+  const gridGrades=[0,2,4,6];
+  return(
+    <svg width="100%" viewBox={"0 0 "+W+" "+H} style={{overflow:"visible"}}>
+      {/* グリッド */}
+      {gridGrades.map(g=>{
+        const y=yOf(g);
+        const lb=["F","C","A-","S"][gridGrades.indexOf(g)];
+        return <g key={g}>
+          <line x1={PAD.l} y1={y} x2={W-PAD.r} y2={y} stroke="#e2e8f0" strokeWidth="0.8" strokeDasharray="3,3"/>
+          <text x={PAD.l-4} y={y} textAnchor="end" dominantBaseline="middle" fontSize="8" fill="#94a3b8">{lb}</text>
+        </g>;
+      })}
+      {/* 折れ線 */}
+      {sorted.length>1&&<path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round"/>}
+      {/* ドット + ラベル */}
+      {points.map((p,i)=>{
+        const g=effGrade(sorted[i]);
+        const col=GRADE_COLORS[g]||"#94a3b8";
+        return <g key={i}>
+          <circle cx={p[0]} cy={p[1]} r="5" fill={col} stroke="#fff" strokeWidth="1.5"/>
+          <text x={p[0]} y={p[1]-10} textAnchor="middle" fontSize="9" fontWeight="700" fill={col}>{g}</text>
+          <text x={p[0]} y={H-PAD.b+14} textAnchor="middle" fontSize="8" fill="#64748b">{sorted[i].period}</text>
+        </g>;
+      })}
+    </svg>
+  );
+}
+
+function CompareBar({label,curr,prev}){
+  if(curr==null&&prev==null)return null;
+  const cV=curr??0, pV=prev??0, diff=cV-pV;
+  const cols=["#ef4444","#f97316","#eab308","#22c55e","#6366f1"];
+  return(
+    <div style={{marginBottom:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+        <span style={{fontSize:"0.75rem",color:"#374151"}}>{label}</span>
+        <span style={{fontSize:"0.72rem",color:diff>0?"#22c55e":diff<0?"#ef4444":"#94a3b8",fontWeight:700}}>
+          {curr!=null?curr:"-"}{prev!=null&&curr!=null&&diff!==0?(" ("+( diff>0?"+":"")+diff+")"):""}{prev!=null&&curr==null?"(前回:"+prev+")":""}
+        </span>
+      </div>
+      <div style={{display:"flex",gap:3,alignItems:"center"}}>
+        {prev!=null&&<div style={{flex:1,background:"#f1f5f9",borderRadius:3,height:5,overflow:"hidden"}}>
+          <div style={{width:((pV/5)*100)+"%",height:"100%",background:cols[pV-1]||"#e2e8f0",opacity:.45,borderRadius:3}}/>
+        </div>}
+        {curr!=null&&<div style={{flex:1,background:"#f1f5f9",borderRadius:3,height:5,overflow:"hidden"}}>
+          <div style={{width:((cV/5)*100)+"%",height:"100%",background:cols[cV-1]||"#e2e8f0",borderRadius:3}}/>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+function HistoryTab({emp,onEdit}){
+  const [editEvalIdx,setEditEvalIdx]=useState(null);
+  // "trend" = 推移グラフ, "compare" = 期間比較, "detail" = 詳細一覧
+  const [mode,setMode]=useState("trend");
+  const [cmpA,setCmpA]=useState(0);
+  const [cmpB,setCmpB]=useState(1);
+  const evs=emp.evaluations; // 新→古
+
+  if(evs.length===0)return <div style={{color:"#94a3b8",padding:"20px 0"}}>評価データがありません。「＋ 評価追加」から入力してください。</div>;
+
+  const cats=[...new Set(COMPETENCE_ITEMS.map(i=>i.cat))];
+
+  return <div>
+    {/* ===== 上部コントロールバー ===== */}
+    <div style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+      {/* モード選択 */}
+      <div style={{display:"flex",gap:6,marginBottom:evs.length>=2?12:0,flexWrap:"wrap"}}>
+        {[
+          {id:"trend",  label:"📈 推移グラフ"},
+          {id:"compare",label:"⚖️ 期間比較",  hide:evs.length<2},
+          {id:"detail", label:"📋 詳細一覧"},
+        ].filter(m=>!m.hide).map(m=>(
+          <button key={m.id} onClick={()=>setMode(m.id)} style={{
+            padding:"7px 16px",borderRadius:8,border:"1.5px solid "+(mode===m.id?"#6366f1":"#e2e8f0"),
+            background:mode===m.id?"#6366f1":"#fff",
+            color:mode===m.id?"#fff":"#64748b",
+            fontWeight:mode===m.id?700:400,fontSize:"0.85rem",cursor:"pointer"
+          }}>{m.label}</button>
+        ))}
+        <span style={{marginLeft:"auto",fontSize:"0.75rem",color:"#94a3b8",alignSelf:"center"}}>{evs.length}期分のデータ</span>
+      </div>
+
+      {/* 期間セレクト — 比較モードのみ表示 */}
+      {mode==="compare"&&evs.length>=2&&<div style={{
+        display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:10,alignItems:"center",
+        background:"#f0f4ff",borderRadius:10,padding:"12px 14px",border:"1px solid #c7d2fe"
+      }}>
+        <div>
+          <label style={{...LS,color:"#4338ca"}}>比較する期（新）</label>
+          <select value={cmpA} onChange={e=>setCmpA(Number(e.target.value))}
+            style={{...IS,border:"1.5px solid #6366f1",background:"#fff",fontWeight:600}}>
+            {evs.map((ev,i)=><option key={i} value={i}>{ev.period}　{effGrade(ev)?("（"+effGrade(ev)+"）"):""}</option>)}
+          </select>
+        </div>
+        <div style={{textAlign:"center",paddingTop:16,fontSize:"1.2rem",color:"#6366f1"}}>⇔</div>
+        <div>
+          <label style={{...LS,color:"#4338ca"}}>比較する期（旧）</label>
+          <select value={cmpB} onChange={e=>setCmpB(Number(e.target.value))}
+            style={{...IS,border:"1.5px solid #94a3b8",background:"#fff",fontWeight:600}}>
+            {evs.map((ev,i)=><option key={i} value={i}>{ev.period}　{effGrade(ev)?("（"+effGrade(ev)+"）"):""}</option>)}
+          </select>
+        </div>
+      </div>}
+    </div>
+
+    {/* ===== 推移グラフ ===== */}
+    {mode==="trend"&&<div style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"16px 18px",marginBottom:16}}>
+      <TrendChart evaluations={evs}/>
+      {/* グレード一覧サマリー */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:16,justifyContent:"center"}}>
+        {[...evs].reverse().map((ev,i,arr)=>{
+          const g=effGrade(ev);
+          const prevG=i>0?effGrade(arr[i-1]):null;
+          return <div key={i} style={{textAlign:"center",minWidth:64}}>
+            <div style={{fontSize:"0.68rem",color:"#94a3b8",marginBottom:2}}>{ev.period}</div>
+            <div style={{
+              background:GRADE_COLORS[g]||"#e2e8f0",color:"#fff",
+              borderRadius:8,padding:"4px 10px",fontWeight:800,fontSize:"1rem",display:"inline-block"
+            }}>{g||"-"}</div>
+            {prevG&&<div style={{fontSize:"0.7rem",marginTop:2,color:GRADE_NUM[g]>GRADE_NUM[prevG]?"#22c55e":GRADE_NUM[g]<GRADE_NUM[prevG]?"#ef4444":"#94a3b8",fontWeight:700}}>
+              {GRADE_NUM[g]>GRADE_NUM[prevG]?"▲":GRADE_NUM[g]<GRADE_NUM[prevG]?"▼":"━"}
+            </div>}
+          </div>;
+        })}
+      </div>
+    </div>}
+
+    {/* ===== 期間比較 ===== */}
+    {mode==="compare"&&evs.length>=2&&(()=>{
+      const evA=evs[cmpA], evB=evs[cmpB];
+      if(!evA||!evB||cmpA===cmpB)return <div style={{color:"#94a3b8",textAlign:"center",padding:20}}>異なる期を選択してください</div>;
+      const gA=effGrade(evA), gB=effGrade(evB);
+      return <div>
+        {/* グレード比較 */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:10,alignItems:"center",marginBottom:16,textAlign:"center"}}>
+          <div style={{background:"#fff",border:"2px solid "+(GRADE_COLORS[gA]||"#e2e8f0"),borderRadius:12,padding:"16px 12px"}}>
+            <div style={{fontSize:"0.75rem",color:"#6366f1",fontWeight:700,marginBottom:6}}>{evA.period}</div>
+            <div style={{fontSize:"2.4rem",fontWeight:900,color:GRADE_COLORS[gA]||"#94a3b8",lineHeight:1}}>{gA||"-"}</div>
+            {(evA.nakaneNextPos||evA.nextPosition)&&<div style={{fontSize:"0.72rem",color:"#64748b",marginTop:6}}>→ {evA.nakaneNextPos||evA.nextPosition}</div>}
+          </div>
+          <div style={{fontSize:"1.5rem"}}><GradeArrow prev={gB} curr={gA}/></div>
+          <div style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"16px 12px",opacity:.85}}>
+            <div style={{fontSize:"0.75rem",color:"#94a3b8",fontWeight:700,marginBottom:6}}>{evB.period}</div>
+            <div style={{fontSize:"2.4rem",fontWeight:900,color:GRADE_COLORS[gB]||"#94a3b8",lineHeight:1}}>{gB||"-"}</div>
+            {(evB.nakaneNextPos||evB.nextPosition)&&<div style={{fontSize:"0.72rem",color:"#94a3b8",marginTop:6}}>→ {evB.nakaneNextPos||evB.nextPosition}</div>}
+          </div>
+        </div>
+        {/* 成果比較 */}
+        <div style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:"0.85rem",color:"#374151",marginBottom:12}}>成果評価の変化</div>
+          {[["sales","売上利益"],["qcd","QCD成果"],["team","チーム成果"],["ai","AI活用"]].map(([k,lb])=>{
+            const vA=evA.achievements?.[k]||"", vB=evB.achievements?.[k]||"";
+            if(!vA&&!vB)return null;
+            return <div key={k} style={{marginBottom:12,borderBottom:"1px solid #f1f5f9",paddingBottom:10}}>
+              <div style={{fontSize:"0.72rem",color:"#6366f1",fontWeight:700,marginBottom:6}}>{lb}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{background:"#eef2ff",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:"0.65rem",color:"#6366f1",fontWeight:700,marginBottom:3}}>{evA.period}</div>
+                  <div style={{fontSize:"0.82rem",color:"#374151"}}>{vA||<span style={{color:"#cbd5e1"}}>記載なし</span>}</div>
+                </div>
+                <div style={{background:"#f8fafc",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:"0.65rem",color:"#94a3b8",fontWeight:700,marginBottom:3}}>{evB.period}</div>
+                  <div style={{fontSize:"0.82rem",color:"#64748b"}}>{vB||<span style={{color:"#cbd5e1"}}>記載なし</span>}</div>
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+        {/* コメント比較 */}
+        {(evA.managerComment||evB.managerComment||evA.nakaneComment||evB.nakaneComment)&&
+        <div style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:"0.85rem",color:"#374151",marginBottom:12}}>コメントの比較</div>
+          {[["managerComment","上司コメント"],["nakaneComment","中根コメント"]].map(([k,lb])=>{
+            const vA=evA[k]||"", vB=evB[k]||"";
+            if(!vA&&!vB)return null;
+            return <div key={k} style={{marginBottom:12}}>
+              <div style={{fontSize:"0.72rem",color:"#64748b",fontWeight:700,marginBottom:6}}>{lb}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{background:"#eef2ff",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:"0.65rem",color:"#6366f1",fontWeight:700,marginBottom:3}}>{evA.period}</div>
+                  <div style={{fontSize:"0.82rem",color:"#374151"}}>{vA||<span style={{color:"#cbd5e1"}}>なし</span>}</div>
+                </div>
+                <div style={{background:"#f8fafc",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:"0.65rem",color:"#94a3b8",fontWeight:700,marginBottom:3}}>{evB.period}</div>
+                  <div style={{fontSize:"0.82rem",color:"#64748b"}}>{vB||<span style={{color:"#cbd5e1"}}>なし</span>}</div>
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>}
+        {/* コンピテンス比較 */}
+        <div style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px 16px"}}>
+          <div style={{fontWeight:700,fontSize:"0.85rem",color:"#374151",marginBottom:4}}>コンピテンスの変化</div>
+          <div style={{fontSize:"0.72rem",color:"#94a3b8",marginBottom:12}}>
+            <span style={{color:"#6366f1",fontWeight:700}}>■ {evA.period}</span>　
+            <span style={{color:"#94a3b8"}}>■ {evB.period}（薄色）</span>　
+            数値は最終評価（中根→上司→本人の順で優先）
+          </div>
+          {cats.map(cat=>{
+            const items=COMPETENCE_ITEMS.filter(i=>i.cat===cat);
+            const hasAny=items.some(item=>{
+              const a=evA.nakaneComp?.[item.no]??evA.managerComp?.[item.no]??evA.selfComp?.[item.no];
+              const b=evB.nakaneComp?.[item.no]??evB.managerComp?.[item.no]??evB.selfComp?.[item.no];
+              return a!=null||b!=null;
+            });
+            if(!hasAny)return null;
+            return <div key={cat} style={{marginBottom:14}}>
+              <div style={{fontSize:"0.72rem",fontWeight:700,color:"#64748b",background:"#f8fafc",padding:"3px 10px",borderRadius:6,marginBottom:8}}>{cat}</div>
+              {items.map(item=>{
+                const cA=evA.nakaneComp?.[item.no]??evA.managerComp?.[item.no]??evA.selfComp?.[item.no];
+                const cB=evB.nakaneComp?.[item.no]??evB.managerComp?.[item.no]??evB.selfComp?.[item.no];
+                if(cA==null&&cB==null)return null;
+                return <CompareBar key={item.no} label={item.name} curr={cA} prev={cB}/>;
+              })}
+            </div>;
+          })}
+        </div>
+      </div>;
+    })()}
+
+    {/* ===== 詳細一覧 ===== */}
+    {mode==="detail"&&<div>
+      {evs.map((ev,ei)=>{
+        const prevEv=evs[ei+1];
+        const g=effGrade(ev), pg=prevEv?effGrade(prevEv):null;
+        return <div key={ei} style={{border:"1.5px solid #e2e8f0",borderRadius:12,marginBottom:14,overflow:"hidden"}}>
+          <div style={{background:"#f8fafc",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{fontWeight:700,color:"#1e293b",fontSize:"0.95rem"}}>{ev.period}</div>
+              {pg&&<GradeArrow prev={pg} curr={g}/>}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              {ev.managerGrade&&<span style={{fontSize:"0.72rem",color:"#dc2626"}}>上司:<GB grade={ev.managerGrade}/></span>}
+              {ev.nakaneGrade&&<span style={{fontSize:"0.72rem",color:"#f59e0b",fontWeight:700}}>中根:<GB grade={ev.nakaneGrade} nakane/></span>}
+              <button onClick={()=>setEditEvalIdx(ei)} style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:6,padding:"3px 10px",fontSize:"0.75rem",color:"#64748b"}}>✏️ 編集</button>
+            </div>
+          </div>
+          <div style={{padding:"12px 16px"}}>
+            {[["sales","売上利益"],["qcd","QCD"],["team","チーム"],["ai","AI活用"]].map(([k,lb])=>ev.achievements?.[k]&&(
+              <div key={k} style={{marginBottom:8}}>
+                <span style={{fontSize:"0.72rem",color:"#94a3b8",fontWeight:600,display:"block",marginBottom:2}}>{lb}：</span>
+                <div style={{fontSize:"0.83rem",color:"#374151",whiteSpace:"pre-wrap",lineHeight:1.7,background:"#f8fafc",borderRadius:6,padding:"6px 10px"}}>{ev.achievements[k]}</div>
+              </div>
+            ))}
+            {ev.managerComment&&<div style={{background:"#f0f4ff",borderRadius:8,padding:"10px 12px",marginTop:10,border:"1px solid #c7d2fe"}}>
+              <div style={{fontSize:"0.7rem",color:"#4338ca",fontWeight:700,marginBottom:6}}>📋 上司コメント</div>
+              <div style={{
+                fontSize:"0.83rem",color:"#374151",
+                whiteSpace:"pre-wrap",lineHeight:1.8,
+                maxHeight:300,overflowY:"auto",
+                paddingRight:4
+              }}>{ev.managerComment}</div>
+              {ev.nextPosition&&<div style={{marginTop:8,fontSize:"0.78rem",color:"#4338ca",borderTop:"1px solid #c7d2fe",paddingTop:6}}>推薦職位: <strong>{ev.nextPosition}</strong></div>}
+            </div>}
+            {(ev.nakaneComment||ev.nakaneGrade)&&<div style={{background:"linear-gradient(135deg,#fefce8,#fffbeb)",borderRadius:8,padding:"10px 12px",marginTop:10,border:"1.5px solid #f59e0b"}}>
+              <div style={{fontSize:"0.7rem",color:"#92400e",fontWeight:700,marginBottom:6}}>中根評価</div>
+              {ev.nakaneGrade&&<div style={{marginBottom:6}}><GB grade={ev.nakaneGrade} nakane/></div>}
+              {ev.nakaneComment&&<div style={{
+                fontSize:"0.83rem",color:"#78350f",
+                whiteSpace:"pre-wrap",lineHeight:1.8,
+                maxHeight:300,overflowY:"auto",
+                paddingRight:4
+              }}>{ev.nakaneComment}</div>}
+              {ev.nakaneNextPos&&<div style={{marginTop:8,fontSize:"0.78rem",color:"#92400e",borderTop:"1px solid #fde68a",paddingTop:6}}>次期職位（最終）: <strong>{ev.nakaneNextPos}</strong></div>}
+            </div>}
+          </div>
+        </div>;
+      })}
+    </div>}
+
+    {editEvalIdx!==null&&<EditEvalModal emp={emp} evalIdx={editEvalIdx} onClose={()=>setEditEvalIdx(null)} onSave={(updated)=>{onEdit(editEvalIdx,updated);setEditEvalIdx(null);}}/>}
+  </div>;
+}
+
+// ---- Radar Section: 個人 + 全体平均 + 部署平均 ----
+function RadarSection({emp,latest,employees}){
+  const rL=["ルール","マナー","継続","感情","成長","知識","情報","顧客","伝達","スピード","信頼","誠実","ポジ"];
+  const keys=[1,2,3,4,5,6,7,8,9,10,11,12,13];
+
+  if(!latest)return null;
+
+  const rS=keys.map(k=>latest.selfComp?.[k]||0);
+  const rMraw=keys.map(k=>latest.managerComp?.[k]||0);
+  const rNraw=keys.map(k=>latest.nakaneComp?.[k]||0);
+  // 上司空白→自己値フォールバック
+  const rM=rMraw.map((v,i)=>v>0?v:rS[i]);
+  // 中根空白→上司値フォールバック
+  const hasNakane=rNraw.some(v=>v>0);
+  const rN=hasNakane?rNraw.map((v,i)=>v>0?v:rM[i]):null;
+
+  // 全体平均（上司評価ベース）
+  const allAvg=keys.map(k=>{
+    const vals=employees.flatMap(e=>e.evaluations.map(ev=>{
+      const mv=ev.managerComp?.[k]||0;
+      return mv>0?mv:(ev.selfComp?.[k]||0);
+    })).filter(v=>v>0);
+    return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0;
+  });
+
+  // 部署平均
+  const deptEmps=employees.filter(e=>e.department===emp.department);
+  const deptAvg=keys.map(k=>{
+    const vals=deptEmps.flatMap(e=>e.evaluations.map(ev=>{
+      const mv=ev.managerComp?.[k]||0;
+      return mv>0?mv:(ev.selfComp?.[k]||0);
+    })).filter(v=>v>0);
+    return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0;
+  });
+
+  const charts=[
+    {label:"個人評価",selfS:rS,managerS:rM,nakaneS:rN},
+    {label:"全体平均",selfS:allAvg,managerS:null,nakaneS:null,avgColor:"#8b5cf6"},
+    {label:emp.department+"平均",selfS:deptAvg,managerS:null,nakaneS:null,avgColor:"#22c55e"},
+  ];
+
+  return <div>
+    <div style={{fontWeight:700,color:"#374151",marginBottom:12,fontSize:"0.9rem"}}>コンピテンス レーダーチャート（基本・コアバリュー）</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:8}}>
+      {charts.map((c,ci)=>(
+        <div key={ci} style={{textAlign:"center",background:"#f8fafc",borderRadius:12,padding:"12px 8px",border:"1.5px solid #e2e8f0"}}>
+          <div style={{fontSize:"0.75rem",fontWeight:700,color:"#374151",marginBottom:6}}>{c.label}</div>
+          {c.avgColor?(
+            // 平均グラフ（単色）
+            <svg width={160} height={160} viewBox="0 0 160 160">
+              {[.2,.4,.6,.8,1].map(f=>{
+                const n=rL.length,cx=80,cy=80,r=52;
+                const grid=frac=>Array.from({length:n},(_,i)=>{const a=(2*Math.PI*i)/n-Math.PI/2;return (cx+frac*r*Math.cos(a))+","+(cy+frac*r*Math.sin(a));}).join(" ");
+                return <polygon key={f} points={grid(f)} fill="none" stroke="#e2e8f0" strokeWidth="0.8"/>;
+              })}
+              {Array.from({length:rL.length},(_,i)=>{const n=rL.length,cx=80,cy=80,r=52,a=(2*Math.PI*i)/n-Math.PI/2;return <line key={i} x1={cx} y1={cy} x2={cx+r*Math.cos(a)} y2={cy+r*Math.sin(a)} stroke="#e2e8f0" strokeWidth="0.8"/>;})}
+              <polygon points={c.selfS.map((v,i)=>{const n=rL.length,cx=80,cy=80,r=52,a=(2*Math.PI*i)/n-Math.PI/2,rv=(Math.max(0,v)/5)*r;return (cx+rv*Math.cos(a))+","+(cy+rv*Math.sin(a));}).join(" ")} fill={c.avgColor+"22"} stroke={c.avgColor} strokeWidth="2"/>
+              {rL.map((lb,i)=>{const n=rL.length,cx=80,cy=80,r=52,a=(2*Math.PI*i)/n-Math.PI/2;return <text key={i} x={cx+(r+14)*Math.cos(a)} y={cy+(r+14)*Math.sin(a)} textAnchor="middle" dominantBaseline="middle" fontSize="6" fill="#64748b">{lb}</text>;})}
+            </svg>
+          ):(
+            <RadarChart selfS={c.selfS} managerS={c.managerS} nakaneS={c.nakaneS} labels={rL} size={160}/>
+          )}
+        </div>
+      ))}
+    </div>
+    <div style={{display:"flex",gap:14,justifyContent:"center",marginBottom:16,fontSize:"0.72rem",flexWrap:"wrap"}}>
+      <span style={{color:"#6366f1"}}>━ 本人</span>
+      <span style={{color:"#dc2626"}}>╌ 上司（空白は本人値を使用）</span>
+      {hasNakane&&<span style={{color:"#f59e0b",fontWeight:700}}>━ 中根（空白は上司値を使用）</span>}
+      <span style={{color:"#8b5cf6"}}>━ 全体平均</span>
+      <span style={{color:"#22c55e"}}>━ 部署平均</span>
+    </div>
+  </div>;
+}
+// ---- Competence Item with tooltip ----
+function CompItem({item,s,m,nk}){
+  const [show,setShow]=useState(false);
+  const ref=useRef();
+  // クリック外で閉じる
+  useEffect(()=>{
+    if(!show)return;
+    const handler=(e)=>{if(ref.current&&!ref.current.contains(e.target))setShow(false);};
+    document.addEventListener("mousedown",handler);
+    return()=>document.removeEventListener("mousedown",handler);
+  },[show]);
+  return <div style={{display:"grid",gridTemplateColumns:"22px 1fr 28px 190px",gap:6,marginBottom:7,alignItems:"center"}}>
+    <span style={{fontSize:"0.7rem",color:"#cbd5e1",textAlign:"right"}}>{item.no}</span>
+    <span style={{fontSize:"0.82rem",color:"#374151"}}>{item.name}</span>
+    <div ref={ref} style={{position:"relative"}}>
+      <button
+        onClick={()=>setShow(p=>!p)}
+        style={{width:22,height:22,borderRadius:"50%",border:"1.5px solid #c7d2fe",background:show?"#6366f1":"#fff",color:show?"#fff":"#6366f1",fontSize:"0.65rem",fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
+      >?</button>
+      {show&&<div style={{
+        position:"fixed",left:"50%",top:"50%",transform:"translate(-50%,-50%)",
+        zIndex:1000,background:"#1e293b",color:"#f1f5f9",fontSize:"0.85rem",
+        borderRadius:14,padding:"18px 20px",
+        width:"min(420px, 90vw)",
+        lineHeight:1.8,boxShadow:"0 16px 48px rgba(0,0,0,0.5)"
+      }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+          <div style={{fontWeight:800,color:"#a5b4fc",fontSize:"0.9rem"}}>No.{item.no}　{item.name}</div>
+          <button onClick={()=>setShow(false)} style={{background:"none",border:"none",color:"#94a3b8",fontSize:"1.2rem",cursor:"pointer",lineHeight:1,marginLeft:12,flexShrink:0}}>×</button>
+        </div>
+        <div style={{color:"#e2e8f0"}}>{item.desc}</div>
+      </div>}
+      {/* オーバーレイ背景 */}
+      {show&&<div onClick={()=>setShow(false)} style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.3)"}}/>}
+    </div>
+    <ScoreBar self={s} manager={m} nakane={nk}/>
+  </div>;
+}
+function RadarChart({selfS,managerS,nakaneS,labels,size}){
+  size=size||220;
+  const n=labels.length,cx=size/2,cy=size/2,r=size/2-28;
+  const angle=i=>(2*Math.PI*i)/n-Math.PI/2;
+  const pts=vals=>vals.map((v,i)=>{const a=angle(i),rv=(Math.max(0,v)/5)*r;return (cx+rv*Math.cos(a))+","+(cy+rv*Math.sin(a));}).join(" ");
+  const grid=frac=>Array.from({length:n},(_,i)=>{const a=angle(i);return (cx+frac*r*Math.cos(a))+","+(cy+frac*r*Math.sin(a));}).join(" ");
+  // 上司空白→自己値でフォールバック、中根空白→上司値（フォールバック後）でフォールバック
+  const effM = selfS&&managerS ? managerS.map((v,i)=>v>0?v:(selfS[i]||0)) : managerS;
+  const effN = effM&&nakaneS ? nakaneS.map((v,i)=>v>0?v:(effM[i]||0)) : nakaneS;
+  const showNakane = nakaneS&&nakaneS.some(v=>v>0);
+  return <svg width={size} height={size} viewBox={"0 0 "+size+" "+size}>
+    {[.2,.4,.6,.8,1].map(f=><polygon key={f} points={grid(f)} fill="none" stroke="#e2e8f0" strokeWidth="0.8"/>)}
+    {Array.from({length:n},(_,i)=>{const a=angle(i);return <line key={i} x1={cx} y1={cy} x2={cx+r*Math.cos(a)} y2={cy+r*Math.sin(a)} stroke="#e2e8f0" strokeWidth="0.8"/>;})}
+    {effM&&<polygon points={pts(effM)} fill="rgba(220,38,38,0.1)" stroke="#dc2626" strokeWidth="1.5" strokeDasharray="3,2"/>}
+    {selfS&&<polygon points={pts(selfS)} fill="rgba(99,102,241,0.1)" stroke="#6366f1" strokeWidth="1.5"/>}
+    {showNakane&&effN&&<polygon points={pts(effN)} fill="rgba(245,158,11,0.15)" stroke="#f59e0b" strokeWidth="2"/>}
+    {labels.map((lb,i)=>{const a=angle(i);return <text key={i} x={cx+(r+16)*Math.cos(a)} y={cy+(r+16)*Math.sin(a)} textAnchor="middle" dominantBaseline="middle" fontSize="6.5" fill="#64748b">{lb}</text>;})}
+  </svg>;
+}
+
+// ============================================================
+// EDIT EVAL MODAL
+// 上司評価タブ：成果・コンピテンス・コメント・グレード編集
+// 中根評価タブ：中根グレード・中根コンピ修正・中根コメント・次期職位
+// ============================================================
+function EditEvalModal({emp,evalIdx,onClose,onSave}){
+  const ev=emp.evaluations[evalIdx];
+  const [tab,setTab]=useState("manager");
+  const [f,setF]=useState({
+    period:ev.period||"",
+    grade:ev.grade||"",
+    managerGrade:ev.managerGrade||ev.grade||"",
+    ssS:ev.specialSkillSelf??"", ssM:ev.specialSkillManager??"",
+    sales:ev.achievements?.sales||"",qcd:ev.achievements?.qcd||"",
+    team:ev.achievements?.team||"",ai:ev.achievements?.ai||"",
+    managerComment:ev.managerComment||"",
+    nextPosition:ev.nextPosition||"",
+    selfComp:{...ev.selfComp},
+    managerComp:{...(ev.managerComp||{})},
+    nakaneGrade:ev.nakaneGrade||"",
+    nakaneComp:{...(ev.nakaneComp||{})},
+    nakaneComment:ev.nakaneComment||"",
+    nakaneNextPos:ev.nakaneNextPos||"",
+  });
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const uC=(type,no,val)=>setF(p=>({...p,[type]:{...p[type],[no]:val===""?undefined:Number(val)}}));
+  const cats=[...new Set(COMPETENCE_ITEMS.map(i=>i.cat))];
+
+  const handleSave=()=>onSave({...ev,
+    period:f.period,grade:f.grade,managerGrade:f.managerGrade,
+    specialSkillSelf:f.ssS===""?null:Number(f.ssS),
+    specialSkillManager:f.ssM===""?null:Number(f.ssM),
+    achievements:{sales:f.sales,qcd:f.qcd,team:f.team,ai:f.ai},
+    selfComp:f.selfComp,managerComp:f.managerComp,
+    managerComment:f.managerComment,nextPosition:f.nextPosition,
+    nakaneGrade:f.nakaneGrade,nakaneComp:f.nakaneComp,
+    nakaneComment:f.nakaneComment,nakaneNextPos:f.nakaneNextPos,
+  });
+
+  const tabBtnStyle=(id)=>({
+    padding:"10px 20px",border:"none",background:"transparent",cursor:"pointer",
+    fontWeight:tab===id?700:400,fontSize:"0.88rem",
+    borderBottom:tab===id?("2.5px solid "+(id==="nakane"?"#f59e0b":"#6366f1")):"2.5px solid transparent",
+    color:tab===id?(id==="nakane"?"#92400e":"#6366f1"):"#64748b",
+  });
+
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
+    <div style={{background:"#fff",borderRadius:16,width:740,maxWidth:"100%",maxHeight:"93vh",overflow:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.35)"}}>
+      {/* Header */}
+      <div style={{position:"sticky",top:0,background:"#fff",padding:"16px 24px",borderBottom:"1.5px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:"1rem",color:"#1e293b"}}>評価編集 — {emp.name} / {f.period}</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:"1.5rem",color:"#94a3b8",lineHeight:1}}>×</button>
+      </div>
+      {/* Tabs */}
+      <div style={{display:"flex",borderBottom:"1.5px solid #e2e8f0",background:"#fafbfc",padding:"0 24px"}}>
+        <button onClick={()=>setTab("manager")} style={tabBtnStyle("manager")}>📋 上司評価の編集</button>
+        <button onClick={()=>setTab("nakane")} style={tabBtnStyle("nakane")}>中根評価の入力</button>
+      </div>
+
+      <div style={{padding:"20px 24px"}}>
+        {/* ======= 上司評価タブ ======= */}
+        {tab==="manager"&&<>
+          {/* 基本情報 */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#1e293b",fontSize:"0.88rem",borderBottom:"2px solid #e0e7ff",paddingBottom:6,marginBottom:12}}>基本情報</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><label style={LS}>期間</label><input value={f.period} onChange={e=>u("period",e.target.value)} style={IS}/></div>
+              <div><label style={LS}>上司評価グレード</label><GSel value={f.managerGrade} onChange={v=>u("managerGrade",v)}/></div>
+            </div>
+          </div>
+          {/* 成果評価 */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#1e293b",fontSize:"0.88rem",borderBottom:"2px solid #e0e7ff",paddingBottom:6,marginBottom:12}}>① 成果評価（上司記入）</div>
+            {[["sales","売上利益への貢献"],["qcd","QCD成果"],["team","チーム成果"],["ai","AI活用"]].map(([k,lb])=>(
+              <div key={k} style={{marginBottom:10}}><label style={LS}>{lb}</label><textarea value={f[k]} onChange={e=>u(k,e.target.value)} style={{...IS,height:56,resize:"vertical"}}/></div>
+            ))}
+          </div>
+          {/* 専門スキル */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#1e293b",fontSize:"0.88rem",borderBottom:"2px solid #e0e7ff",paddingBottom:6,marginBottom:12}}>② 専門スキル評価</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><label style={LS}>本人評価 Lv（○）</label><select value={f.ssS} onChange={e=>u("ssS",e.target.value)} style={IS}><option value="">-</option>{[1,2,3,4,5,6,7].map(n=><option key={n} value={n}>Lv {n}</option>)}</select></div>
+              <div><label style={LS}>上司評価 Lv（●）</label><select value={f.ssM} onChange={e=>u("ssM",e.target.value)} style={IS}><option value="">-</option>{[1,2,3,4,5,6,7].map(n=><option key={n} value={n}>Lv {n}</option>)}</select></div>
+            </div>
+          </div>
+          {/* コンピテンス */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#1e293b",fontSize:"0.88rem",borderBottom:"2px solid #e0e7ff",paddingBottom:6,marginBottom:12}}>③ コンピテンス評価（上司記入）</div>
+            <div style={{display:"grid",gridTemplateColumns:"20px 1fr 80px 80px",gap:"4px 8px",alignItems:"center",marginBottom:8}}>
+              <div/><div style={{fontSize:"0.72rem",color:"#94a3b8"}}>項目</div>
+              <div style={{fontSize:"0.72rem",color:"#6366f1",textAlign:"center"}}>本人</div>
+              <div style={{fontSize:"0.72rem",color:"#dc2626",textAlign:"center"}}>上司</div>
+            </div>
+            {cats.map(cat=>(
+              <div key={cat} style={{marginBottom:10}}>
+                <div style={{fontSize:"0.75rem",fontWeight:700,color:"#64748b",background:"#f8fafc",padding:"4px 8px",borderRadius:6,marginBottom:6}}>{cat}</div>
+                {COMPETENCE_ITEMS.filter(i=>i.cat===cat).map(item=>(
+                  <div key={item.no} style={{display:"grid",gridTemplateColumns:"20px 1fr 80px 80px",gap:"4px 8px",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:"0.7rem",color:"#cbd5e1",textAlign:"right"}}>{item.no}</span>
+                    <span style={{fontSize:"0.8rem",color:"#374151"}}>{item.name}</span>
+                    <SSel value={f.selfComp[item.no]??""} onChange={v=>uC("selfComp",item.no,v)} color="#6366f1"/>
+                    <SSel value={f.managerComp[item.no]??""} onChange={v=>uC("managerComp",item.no,v)} color="#dc2626"/>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* 上司コメント */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#1e293b",fontSize:"0.88rem",borderBottom:"2px solid #e0e7ff",paddingBottom:6,marginBottom:12}}>上司コメント・推薦</div>
+            <div style={{marginBottom:10}}><label style={LS}>上司コメント・理由・アドバイス</label><textarea value={f.managerComment} onChange={e=>u("managerComment",e.target.value)} style={{...IS,height:80,resize:"vertical"}}/></div>
+            <div><label style={LS}>次の職位（上司推薦）</label><select value={f.nextPosition} onChange={e=>u("nextPosition",e.target.value)} style={IS}><option value="">-</option>{POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}</select></div>
+          </div>
+        </>}
+
+        {/* ======= 中根評価タブ ======= */}
+        {tab==="nakane"&&<>
+          {/* 上司評価の参照 */}
+          <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 16px",marginBottom:20,border:"1.5px solid #e2e8f0"}}>
+            <div style={{fontSize:"0.78rem",color:"#64748b",fontWeight:700,marginBottom:8}}>📋 上司評価（参照用）</div>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:"0.85rem",alignItems:"center"}}>
+              <span>グレード: <strong><GB grade={f.managerGrade}/></strong></span>
+              <span>推薦職位: <strong>{f.nextPosition||"-"}</strong></span>
+            </div>
+            {f.managerComment&&<div style={{marginTop:8,fontSize:"0.83rem",color:"#374151",background:"#fff",borderRadius:8,padding:"8px 12px"}}>{f.managerComment}</div>}
+          </div>
+
+          {/* 中根評価入力エリア */}
+          <div style={{background:"linear-gradient(135deg,#fefce8,#fffbeb)",border:"2px solid #f59e0b",borderRadius:12,padding:18,marginBottom:20}}>
+            <div style={{fontWeight:800,color:"#92400e",fontSize:"0.9rem",marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:"1.1rem"}}></span>中根評価
+              <span style={{fontSize:"0.72rem",color:"#b45309",fontWeight:400}}>— 空欄の場合は上司評価を採用</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              <div>
+                <label style={NLS}>中根 最終評価グレード</label>
+                <GSel value={f.nakaneGrade} onChange={v=>u("nakaneGrade",v)} gold/>
+                <div style={{fontSize:"0.7rem",color:"#92400e",marginTop:4}}>空欄 → 上司評価「{f.managerGrade||"-"}」を採用</div>
+              </div>
+              <div>
+                <label style={NLS}>中根 推薦次期職位</label>
+                <select value={f.nakaneNextPos} onChange={e=>u("nakaneNextPos",e.target.value)} style={NIS}>
+                  <option value="">-（上司推薦「{f.nextPosition||"-"}」を採用）</option>
+                  {POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={NLS}>中根 コメント・フィードバック</label>
+              <textarea value={f.nakaneComment} onChange={e=>u("nakaneComment",e.target.value)}
+                placeholder="中根からのコメント・フィードバックを入力してください（上司コメントとは別に保存されます）"
+                style={{...NIS,height:90,resize:"vertical"}}/>
+            </div>
+          </div>
+
+          {/* 中根コンピテンス修正 */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:800,color:"#92400e",fontSize:"0.88rem",borderBottom:"2px solid #f59e0b",paddingBottom:6,marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+              <span></span>コンピテンス — 中根による修正（任意）
+            </div>
+            <div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:"0.78rem",color:"#92400e"}}>
+              空欄にすると上司の評価をそのまま採用します。修正が必要な項目のみ入力してください。
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"20px 1fr 60px 60px 70px",gap:"4px 6px",alignItems:"center",marginBottom:8}}>
+              <div/><div style={{fontSize:"0.72rem",color:"#94a3b8"}}>項目</div>
+              <div style={{fontSize:"0.65rem",color:"#6366f1",textAlign:"center"}}>本人</div>
+              <div style={{fontSize:"0.65rem",color:"#dc2626",textAlign:"center"}}>上司</div>
+              <div style={{fontSize:"0.65rem",color:"#f59e0b",textAlign:"center",fontWeight:700}}>中根</div>
+            </div>
+            {cats.map(cat=>(
+              <div key={cat} style={{marginBottom:10}}>
+                <div style={{fontSize:"0.75rem",fontWeight:700,color:"#64748b",background:"#f8fafc",padding:"4px 8px",borderRadius:6,marginBottom:6}}>{cat}</div>
+                {COMPETENCE_ITEMS.filter(i=>i.cat===cat).map(item=>(
+                  <div key={item.no} style={{display:"grid",gridTemplateColumns:"20px 1fr 60px 60px 70px",gap:"4px 6px",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:"0.7rem",color:"#cbd5e1",textAlign:"right"}}>{item.no}</span>
+                    <span style={{fontSize:"0.8rem",color:"#374151"}}>{item.name}</span>
+                    <div style={{textAlign:"center",fontSize:"0.78rem",color:"#6366f1",fontWeight:600}}>{f.selfComp[item.no]||"-"}</div>
+                    <div style={{textAlign:"center",fontSize:"0.78rem",color:"#dc2626",fontWeight:600}}>{f.managerComp[item.no]||"-"}</div>
+                    <SSel value={f.nakaneComp[item.no]??""} onChange={v=>uC("nakaneComp",item.no,v)} color="#f59e0b"/>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>}
+      </div>
+
+      {/* Footer */}
+      <div style={{position:"sticky",bottom:0,background:"#fff",padding:"14px 24px",borderTop:"1.5px solid #e2e8f0",display:"flex",gap:8}}>
+        <button onClick={onClose} style={{flex:1,padding:10,border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",color:"#64748b",fontWeight:600}}>キャンセル</button>
+        <button onClick={handleSave} style={{flex:2,padding:10,background:tab==="nakane"?"#f59e0b":"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:800,fontSize:"0.95rem"}}>
+          {tab==="nakane"?"中根評価を保存する":"📋上司評価を保存する"}
+        </button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ============================================================
+// EMPLOYEE DETAIL
+// ============================================================
+function EmployeeDetail({emp,onBack,onEdit,onAddEval,onDelete,onUpdateProfile,employees}){
+  const [tab,setTab]=useState("overview");
+  const [editEvalIdx,setEditEvalIdx]=useState(null);
+  const [confirmDelete,setConfirmDelete]=useState(false);
+  const [editingProfile,setEditingProfile]=useState(false);
+  const [pf,setPf]=useState({name:emp.name,department:emp.department,position:emp.position,role:emp.role,email:emp.email,joinDate:emp.joinDate});
+  const updP=(k,v)=>setPf(f=>({...f,[k]:v}));
+  const saveP=()=>{onUpdateProfile({...emp,...pf});setEditingProfile(false);};
+  const cancelP=()=>{setPf({name:emp.name,department:emp.department,position:emp.position,role:emp.role,email:emp.email,joinDate:emp.joinDate});setEditingProfile(false);};
+  const latest=emp.evaluations[0];
+  const cats=[...new Set(COMPETENCE_ITEMS.map(i=>i.cat))];
+  const rL=["ルール","マナー","継続","感情","成長","知識","情報","顧客","伝達","スピード","信頼","誠実","ポジ"];
+  const rS=latest?[1,2,3,4,5,6,7,8,9,10,11,12,13].map(k=>latest.selfComp?.[k]||0):null;
+  const rM=latest?[1,2,3,4,5,6,7,8,9,10,11,12,13].map(k=>latest.managerComp?.[k]||0):null;
+  const rN=latest?[1,2,3,4,5,6,7,8,9,10,11,12,13].map(k=>latest.nakaneComp?.[k]||0):null;
+  const hasNakaneComp=rN&&rN.some(v=>v>0);
+  const fg=latest?effGrade(latest):"";
+  const fnp=latest?effNextPos(latest):"";
+
+  return <div style={{background:"#fff",borderRadius:16,border:"1.5px solid #e2e8f0",overflow:"hidden"}}>
+    {/* ヘッダー */}
+    <div style={{background:"linear-gradient(135deg,#312e81,#6366f1)",padding:"20px 24px",color:"#fff"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <button onClick={onBack} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:"0.82rem"}}>← 一覧</button>
+        <button onClick={()=>setConfirmDelete(true)} style={{background:"rgba(239,68,68,0.3)",border:"1px solid rgba(239,68,68,0.5)",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:"0.82rem"}}>🗑 削除</button>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:"1.5rem",fontWeight:800}}>{emp.name}</div>
+          <div style={{opacity:.85,fontSize:"0.88rem",marginTop:4}}>{emp.role}</div>
+          <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+            <DTag dept={emp.department}/>
+            <span style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"2px 12px",fontSize:"0.78rem"}}>{emp.position} / {POSITION_NAMES[emp.position]}</span>
+            <span style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"2px 12px",fontSize:"0.78rem"}}>入社 {emp.joinDate}</span>
+          </div>
+        </div>
+        {latest&&<div style={{textAlign:"center"}}>
+          <div style={{fontSize:"0.7rem",opacity:.7,marginBottom:4}}>{latest.period}</div>
+          <div style={{fontSize:"2.8rem",fontWeight:900,lineHeight:1.1,color:"#fff"}}>
+            {latest.nakaneGrade || latest.managerGrade || "-"}
+          </div>
+          {latest.nakaneGrade
+            ? <div style={{fontSize:"0.72rem",opacity:.85,marginTop:4,background:"rgba(0,0,0,0.2)",borderRadius:20,padding:"1px 8px"}}>上司: {latest.managerGrade||"-"}</div>
+            : latest.managerGrade
+              ? <div style={{fontSize:"0.72rem",opacity:.7,marginTop:4}}>上司評価</div>
+              : <div style={{fontSize:"0.72rem",opacity:.5,marginTop:4}}>未評価</div>
+          }
+        </div>}
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+        <button onClick={onAddEval} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:"0.82rem",fontWeight:600}}>＋ 評価追加</button>
+        {latest&&<button onClick={()=>setEditEvalIdx(0)} style={{background:"rgba(255,220,0,0.25)",border:"1px solid rgba(255,220,0,0.5)",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:"0.82rem",fontWeight:600}}>✏️ 最新評価を編集</button>}
+      </div>
+    </div>
+
+    {/* タブ */}
+    <div style={{display:"flex",borderBottom:"1.5px solid #e2e8f0",background:"#fafbfc",overflowX:"auto"}}>
+      {[{id:"overview",label:"概要"},{id:"history",label:"評価履歴 ("+emp.evaluations.length+")"},{id:"competence",label:"コンピテンス全49項目"},{id:"resume",label:"職歴・スキル"}].map(t=>(
+        <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"10px 18px",border:"none",background:"transparent",fontWeight:tab===t.id?700:400,whiteSpace:"nowrap",borderBottom:tab===t.id?"2.5px solid #6366f1":"2.5px solid transparent",color:tab===t.id?"#6366f1":"#64748b",fontSize:"0.85rem"}}>{t.label}</button>
+      ))}
+    </div>
+
+    <div style={{padding:20}}>
+      {tab==="overview"&&<div>
+        {/* プロフィール */}
+        {editingProfile?(
+          <div style={{background:"#f0f4ff",borderRadius:12,padding:16,marginBottom:20,border:"1.5px solid #c7d2fe"}}>
+            <div style={{fontWeight:700,color:"#4338ca",marginBottom:14,fontSize:"0.9rem"}}>✏️ プロフィール編集</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              <div><label style={LS}>氏名</label><input value={pf.name} onChange={e=>updP("name",e.target.value)} style={IS}/></div>
+              <div><label style={LS}>役職</label><input value={pf.role} onChange={e=>updP("role",e.target.value)} style={IS}/></div>
+              <div><label style={LS}>部署</label><select value={pf.department} onChange={e=>updP("department",e.target.value)} style={IS}>{DEPARTMENTS.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+              <div><label style={LS}>職位</label><select value={pf.position} onChange={e=>updP("position",e.target.value)} style={IS}>{POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}</select></div>
+              <div><label style={LS}>メール</label><input value={pf.email} onChange={e=>updP("email",e.target.value)} style={IS}/></div>
+              <div><label style={LS}>入社日</label><input value={pf.joinDate} onChange={e=>updP("joinDate",e.target.value)} style={IS}/></div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={cancelP} style={{flex:1,padding:"8px",border:"1.5px solid #c7d2fe",borderRadius:8,background:"#fff",color:"#64748b",fontWeight:600}}>キャンセル</button>
+              <button onClick={saveP} style={{flex:1,padding:"8px",background:"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:700}}>保存する</button>
+            </div>
+          </div>
+        ):(
+          <div style={{background:"#f8fafc",borderRadius:12,padding:16,marginBottom:20,border:"1.5px solid #e2e8f0"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontWeight:700,color:"#374151",fontSize:"0.9rem"}}>プロフィール</div>
+              <button onClick={()=>setEditingProfile(true)} style={{background:"#eef2ff",border:"1px solid #c7d2fe",borderRadius:8,padding:"4px 12px",fontSize:"0.78rem",color:"#6366f1",fontWeight:700}}>✏️ 編集</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+              {[{l:"氏名",v:emp.name},{l:"役職",v:emp.role||"—"},{l:"部署",v:<DTag dept={emp.department}/>},{l:"職位",v:emp.position+" / "+POSITION_NAMES[emp.position]},{l:"メール",v:emp.email||"—"},{l:"入社日",v:emp.joinDate||"—"}].map((item,i)=>(
+                <div key={i} style={{background:"#fff",borderRadius:8,padding:"10px 12px",border:"1px solid #e2e8f0"}}>
+                  <div style={{fontSize:"0.7rem",color:"#94a3b8",marginBottom:3}}>{item.l}</div>
+                  <div style={{fontWeight:600,color:"#1e293b",fontSize:"0.85rem"}}>{item.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {latest&&<>
+          {/* レーダーチャート */}
+          <RadarSection emp={emp} latest={latest} employees={employees}/>
+
+          {/* 上司評価 & 中根評価の並列表示 */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            {/* 上司評価 */}
+            <div style={{background:"#f8fafc",borderRadius:10,padding:14,border:"1.5px solid #e2e8f0"}}>
+              <div style={{fontSize:"0.78rem",color:"#64748b",fontWeight:700,marginBottom:8}}>📋 上司評価</div>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><GB grade={latest.managerGrade||latest.grade}/><span style={{fontSize:"0.78rem",color:"#64748b"}}>{latest.nextPosition&&("→ "+latest.nextPosition)}</span></div>
+              {latest.managerComment&&<div style={{fontSize:"0.82rem",color:"#374151",background:"#fff",borderRadius:8,padding:"8px 10px"}}>{latest.managerComment}</div>}
+            </div>
+            {/* 中根評価 */}
+            <div style={{background:"linear-gradient(135deg,#fefce8,#fffbeb)",borderRadius:10,padding:14,border:"2px solid #f59e0b"}}>
+              <div style={{fontSize:"0.78rem",color:"#92400e",fontWeight:700,marginBottom:8}}>中根評価</div>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+                <GB grade={fg} nakane={!!latest.nakaneGrade}/>
+                <span style={{fontSize:"0.78rem",color:"#92400e"}}>{fnp&&("→ "+fnp)}</span>
+              </div>
+              {latest.nakaneComment?
+                <div style={{fontSize:"0.82rem",color:"#78350f",background:"rgba(255,255,255,0.6)",borderRadius:8,padding:"8px 10px"}}>{latest.nakaneComment}</div>:
+                <div style={{fontSize:"0.75rem",color:"#b45309",fontStyle:"italic"}}>コメント未入力（上司評価を採用）</div>}
+            </div>
+          </div>
+
+          {fnp&&<div style={{background:"#fefce8",borderRadius:10,padding:"10px 14px",borderLeft:"3px solid #f59e0b",marginBottom:16}}>
+            <span style={{fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>次期職位: </span>
+            <span style={{fontWeight:700,color:"#78350f"}}>{fnp} / {POSITION_NAMES[fnp]||fnp}</span>
+          </div>}
+        </>}
+      </div>}
+
+      {tab==="history"&&<HistoryTab emp={emp} onAddEval={onAddEval} onEdit={onEdit}/>}
+
+      {tab==="competence"&&<div>
+        {!latest?<div style={{color:"#94a3b8"}}>評価データがありません</div>:<>
+          <div style={{display:"flex",gap:12,marginBottom:14,fontSize:"0.78rem",flexWrap:"wrap",background:"#f8fafc",padding:"8px 12px",borderRadius:8}}>
+            <span style={{color:"#6366f1",fontWeight:700}}>本人（○）</span>
+            <span style={{color:"#dc2626",fontWeight:700}}>上司（●）</span>
+            <span style={{color:"#f59e0b",fontWeight:700}}>中根（空欄は上司値を採用）</span>
+          </div>
+          {cats.map(cat=>(
+            <div key={cat} style={{marginBottom:20}}>
+              <div style={{fontWeight:700,color:"#374151",marginBottom:8,fontSize:"0.88rem",borderBottom:"1px solid #e2e8f0",paddingBottom:4}}>{cat}</div>
+              {COMPETENCE_ITEMS.filter(i=>i.cat===cat).map(item=>{
+                const s=latest.selfComp?.[item.no]??null;
+                const m=latest.managerComp?.[item.no]??null;
+                const nk=latest.nakaneComp?.[item.no]??null;
+                return <CompItem key={item.no} item={item} s={s} m={m} nk={nk}/>;
+              })}
+            </div>
+          ))}
+        </>}
+      </div>}
+
+      {tab==="resume"&&<div>
+        <div style={{marginBottom:18}}><div style={{fontWeight:700,color:"#374151",marginBottom:8}}>学歴</div><div style={{background:"#f8fafc",borderRadius:8,padding:12,fontSize:"0.85rem",color:"#374151"}}>{emp.resume?.education||"未登録"}</div></div>
+        <div style={{marginBottom:18}}><div style={{fontWeight:700,color:"#374151",marginBottom:8}}>資格・認定</div>
+          {emp.resume?.certifications?.length>0?<div style={{display:"flex",flexWrap:"wrap",gap:8}}>{emp.resume.certifications.map((c,i)=><span key={i} style={{background:"#e0e7ff",color:"#4338ca",borderRadius:20,padding:"4px 12px",fontSize:"0.78rem",fontWeight:600}}>{c}</span>)}</div>:<div style={{color:"#94a3b8",fontSize:"0.85rem"}}>未登録</div>}
+        </div>
+        <div><div style={{fontWeight:700,color:"#374151",marginBottom:8}}>スキル</div>
+          {emp.resume?.skills?.length>0?<div style={{display:"flex",flexWrap:"wrap",gap:8}}>{emp.resume.skills.map((s,i)=><span key={i} style={{background:"#f0fdf4",color:"#16a34a",border:"1px solid #bbf7d0",borderRadius:20,padding:"4px 12px",fontSize:"0.78rem",fontWeight:600}}>{s}</span>)}</div>:<div style={{color:"#94a3b8",fontSize:"0.85rem"}}>未登録</div>}
+        </div>
+      </div>}
+    </div>
+
+    {editEvalIdx!==null&&<EditEvalModal emp={emp} evalIdx={editEvalIdx} onClose={()=>setEditEvalIdx(null)} onSave={(updated)=>{onEdit(editEvalIdx,updated);setEditEvalIdx(null);}}/>}
+    {confirmDelete&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#fff",borderRadius:16,padding:28,width:380,boxShadow:"0 24px 64px rgba(0,0,0,0.3)"}}>
+        <div style={{fontWeight:800,fontSize:"1.05rem",color:"#1e293b",marginBottom:8}}>🗑 社員を削除</div>
+        <div style={{fontSize:"0.9rem",color:"#64748b",marginBottom:20}}>「{emp.name}」のデータをすべて削除しますか？</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setConfirmDelete(false)} style={{flex:1,padding:10,border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",color:"#64748b"}}>キャンセル</button>
+          <button onClick={()=>{onDelete(emp.id);setConfirmDelete(false);}} style={{flex:1,padding:10,background:"#ef4444",color:"#fff",border:"none",borderRadius:8,fontWeight:700}}>削除する</button>
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function Dashboard({employees}){
+  const [df,setDf]=useState("all");
+  const targets=df==="all"?employees:employees.filter(e=>e.department===df);
+  const gc={};
+  targets.forEach(e=>{const g=effGrade(e.evaluations[0]);if(g)gc[g]=(gc[g]||0)+1;});
+  const top=targets.filter(e=>["S","A"].includes(effGrade(e.evaluations[0])));
+  return <div>
+    <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
+      <div style={{fontWeight:800,fontSize:"1.2rem",color:"#1e293b",flex:1}}>📊 ダッシュボード</div>
+      <select value={df} onChange={e=>setDf(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"6px 12px",background:"#fff",fontSize:"0.85rem"}}>
+        <option value="all">全部署</option>{DEPARTMENTS.map(d=><option key={d} value={d}>{d}</option>)}
+      </select>
+    </div>
+    <div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:10,padding:"8px 14px",marginBottom:16,fontSize:"0.8rem",color:"#92400e"}}>
+      グレードは <strong>中根評価</strong> を使用。未入力の場合は上司評価を表示。
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+      {[{l:"対象社員数",v:targets.length,c:"#6366f1",i:"👥"},{l:"S評価",v:gc["S"]||0,c:"#f59e0b",i:"⭐"},{l:"A評価",v:(gc["A"]||0)+(gc["A-"]||0),c:"#22c55e",i:"✅"},{l:"要注意(C以下)",v:(gc["C"]||0)+(gc["D"]||0)+(gc["F"]||0),c:"#ef4444",i:"⚠️"}].map((item,i)=>(
+        <div key={i} style={{background:"#fff",borderRadius:12,padding:16,border:"1.5px solid #e2e8f0",textAlign:"center"}}>
+          <div style={{fontSize:"1.4rem"}}>{item.i}</div>
+          <div style={{fontSize:"1.8rem",fontWeight:800,color:item.c,lineHeight:1.2}}>{item.v}</div>
+          <div style={{fontSize:"0.75rem",color:"#64748b",marginTop:2}}>{item.l}</div>
+        </div>
+      ))}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+      <div style={{background:"#fff",borderRadius:12,border:"1.5px solid #e2e8f0",padding:18}}>
+        <div style={{fontWeight:700,marginBottom:14,color:"#1e293b"}}>最終評価グレード分布</div>
+        {["S","A","A-","B","C","D","F"].map(g=>(
+          <div key={g} style={{display:"flex",alignItems:"center",gap:10,marginBottom:7}}>
+            <GB grade={g}/>
+            <div style={{flex:1,background:"#f1f5f9",borderRadius:4,height:8,overflow:"hidden"}}><div style={{width:((gc[g]||0)/Math.max(targets.length,1))*100+"%",height:"100%",background:GRADE_COLORS[g],borderRadius:4}}/></div>
+            <span style={{fontSize:"0.82rem",color:"#64748b",minWidth:28,textAlign:"right"}}>{gc[g]||0}名</span>
+          </div>
+        ))}
+      </div>
+      <div style={{background:"#fff",borderRadius:12,border:"1.5px solid #e2e8f0",padding:18}}>
+        <div style={{fontWeight:700,marginBottom:14,color:"#1e293b"}}>部署別人数</div>
+        {DEPARTMENTS.map(dept=>{const cnt=employees.filter(e=>e.department===dept).length;const color=DEPT_COLORS[dept];return <div key={dept} style={{marginBottom:9}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:8,height:8,borderRadius:"50%",background:color}}/><span style={{fontSize:"0.82rem",color:"#374151"}}>{dept}</span></div><span style={{fontSize:"0.82rem",fontWeight:700,color:"#1e293b"}}>{cnt}名</span></div>
+          <div style={{background:"#f1f5f9",borderRadius:4,height:7,overflow:"hidden"}}><div style={{width:(cnt/Math.max(employees.length,1))*100+"%",height:"100%",background:color,borderRadius:4}}/></div>
+        </div>;})}
+      </div>
+    </div>
+    <div style={{background:"#fff",borderRadius:12,border:"1.5px solid #e2e8f0",padding:18,marginBottom:16,overflowX:"auto"}}>
+      <div style={{fontWeight:700,marginBottom:14,color:"#1e293b"}}>部署 × 評価グレード マトリクス（最終評価）</div>
+      <table style={{borderCollapse:"collapse",fontSize:"0.8rem",width:"100%"}}>
+        <thead><tr><th style={{padding:"6px 10px",textAlign:"left",color:"#64748b",fontWeight:700,borderBottom:"1.5px solid #e2e8f0"}}>部署</th>{["S","A","A-","B","C","D","合計"].map(g=><th key={g} style={{padding:"6px 10px",textAlign:"center",color:"#64748b",fontWeight:700,borderBottom:"1.5px solid #e2e8f0",minWidth:36}}>{g}</th>)}</tr></thead>
+        <tbody>{DEPARTMENTS.map(dept=>{const emps=employees.filter(e=>e.department===dept);const dg={};emps.forEach(e=>{const g=effGrade(e.evaluations[0]);if(g)dg[g]=(dg[g]||0)+1;});return <tr key={dept} style={{borderBottom:"1px solid #f1f5f9"}}>
+          <td style={{padding:"6px 10px"}}><DTag dept={dept}/></td>
+          {["S","A","A-","B","C","D"].map(g=>{const cnt=dg[g]||0;return <td key={g} style={{padding:"6px 10px",textAlign:"center"}}>{cnt>0?<span style={{background:GRADE_COLORS[g]+"22",color:GRADE_COLORS[g],borderRadius:6,padding:"1px 8px",fontWeight:700}}>{cnt}</span>:<span style={{color:"#e2e8f0"}}>-</span>}</td>;})}
+          <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#1e293b"}}>{emps.length}</td>
+        </tr>;})}
+        </tbody>
+      </table>
+    </div>
+    {top.length>0&&<div style={{background:"#fff",borderRadius:12,border:"1.5px solid #e2e8f0",padding:18}}>
+      <div style={{fontWeight:700,marginBottom:14,color:"#1e293b"}}>⭐ ハイパフォーマー（S・A評価）</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+        {top.map(emp=>{const ev=emp.evaluations[0];const g=effGrade(ev);return <div key={emp.id} style={{background:"#fefce8",border:"1.5px solid #fde68a",borderRadius:10,padding:"10px 14px"}}><div style={{fontWeight:700,fontSize:"0.88rem",color:"#1e293b"}}>{emp.name}</div><div style={{marginTop:4}}><DTag dept={emp.department}/></div><div style={{marginTop:6,display:"flex",gap:6,alignItems:"center"}}><GB grade={g} nakane={!!ev?.nakaneGrade}/><span style={{fontSize:"0.75rem",color:"#92400e"}}>{emp.position}</span></div></div>;})}
+      </div>
+    </div>}
+  </div>;
+}
+
+// ============================================================
+// ADD EVAL
+// ============================================================
+function AddEvalModal({emp,onClose,onSave}){
+  const [f,setF]=useState({period:"",grade:"B",managerGrade:"B",sales:"",qcd:"",team:"",ai:"",managerComment:"",nextPosition:"",nakaneGrade:"",nakaneComment:"",nakaneNextPos:""});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{background:"#fff",borderRadius:16,padding:28,width:520,maxWidth:"100%",maxHeight:"90vh",overflow:"auto",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{fontWeight:800,fontSize:"1.05rem",color:"#1e293b"}}>評価追加 — {emp.name}</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:"1.4rem",color:"#94a3b8",lineHeight:1}}>×</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div><label style={LS}>期間 *</label><input value={f.period} onChange={e=>u("period",e.target.value)} placeholder="2024上期" style={IS}/></div>
+        <div><label style={LS}>上司評価</label><GSel value={f.managerGrade} onChange={v=>u("managerGrade",v)}/></div>
+      </div>
+      {[["sales","① 売上利益"],["qcd","② QCD成果"],["team","③ チーム成果"],["ai","④ AI活用"],["managerComment","上司コメント"]].map(([k,lb])=>(
+        <div key={k} style={{marginBottom:10}}><label style={LS}>{lb}</label><textarea value={f[k]} onChange={e=>u(k,e.target.value)} style={{...IS,height:48,resize:"vertical"}}/></div>
+      ))}
+      <div style={{marginBottom:14}}><label style={LS}>上司 推薦次期職位</label><select value={f.nextPosition} onChange={e=>u("nextPosition",e.target.value)} style={IS}><option value="">-</option>{POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}</select></div>
+      {/* 中根評価 */}
+      <div style={{background:"linear-gradient(135deg,#fefce8,#fffbeb)",border:"2px solid #f59e0b",borderRadius:12,padding:16,marginBottom:14}}>
+        <div style={{fontWeight:800,color:"#92400e",fontSize:"0.88rem",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>中根評価</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
+          <div><label style={NLS}>中根 最終評価</label><GSel value={f.nakaneGrade} onChange={v=>u("nakaneGrade",v)} gold/></div>
+          <div><label style={NLS}>中根 次期職位</label><select value={f.nakaneNextPos} onChange={e=>u("nakaneNextPos",e.target.value)} style={NIS}><option value="">-</option>{POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}</select></div>
+        </div>
+        <div><label style={NLS}>中根 コメント</label><textarea value={f.nakaneComment} onChange={e=>u("nakaneComment",e.target.value)} style={{...NIS,height:60,resize:"vertical"}}/></div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={onClose} style={{flex:1,padding:10,border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",color:"#64748b"}}>キャンセル</button>
+        <button onClick={()=>{if(!f.period){alert("期間を入力");return;}onSave({period:f.period,grade:f.grade,managerGrade:f.managerGrade,specialSkillSelf:null,specialSkillManager:null,achievements:{sales:f.sales,qcd:f.qcd,team:f.team,ai:f.ai},selfComp:{},managerComp:{},managerComment:f.managerComment,nextPosition:f.nextPosition,nakaneGrade:f.nakaneGrade,nakaneComp:{},nakaneComment:f.nakaneComment,nakaneNextPos:f.nakaneNextPos});}} style={{flex:1,padding:10,background:"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:700}}>保存</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ============================================================
+// ADD EMPLOYEE
+// ============================================================
+function AddEmployeeModal({onClose,onSave}){
+  const [f,setF]=useState({name:"",department:DEPARTMENTS[0],position:"ME",joinDate:"",email:"",role:"",education:"",skills:""});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{background:"#fff",borderRadius:16,padding:28,width:500,maxWidth:"100%",maxHeight:"90vh",overflow:"auto",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{fontWeight:800,fontSize:"1.05rem",color:"#1e293b"}}>社員を追加</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:"1.4rem",color:"#94a3b8"}}>×</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div><label style={LS}>氏名 *</label><input value={f.name} onChange={e=>u("name",e.target.value)} placeholder="田中 一郎" style={IS}/></div>
+        <div><label style={LS}>部署</label><select value={f.department} onChange={e=>u("department",e.target.value)} style={IS}>{DEPARTMENTS.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+        <div><label style={LS}>メール</label><input value={f.email} onChange={e=>u("email",e.target.value)} style={IS}/></div>
+        <div><label style={LS}>役職</label><input value={f.role} onChange={e=>u("role",e.target.value)} style={IS}/></div>
+        <div><label style={LS}>入社日</label><input value={f.joinDate} onChange={e=>u("joinDate",e.target.value)} placeholder="2024-04-01" style={IS}/></div>
+        <div><label style={LS}>職位</label><select value={f.position} onChange={e=>u("position",e.target.value)} style={IS}>{POSITIONS.map(p=><option key={p} value={p}>{p} / {POSITION_NAMES[p]}</option>)}</select></div>
+      </div>
+      <div style={{marginBottom:12}}><label style={LS}>学歴</label><input value={f.education} onChange={e=>u("education",e.target.value)} style={IS}/></div>
+      <div style={{marginBottom:16}}><label style={LS}>スキル（カンマ区切り）</label><input value={f.skills} onChange={e=>u("skills",e.target.value)} placeholder="営業,Excel" style={IS}/></div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={onClose} style={{flex:1,padding:10,border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",color:"#64748b"}}>キャンセル</button>
+        <button onClick={()=>{if(!f.name){alert("氏名を入力");return;}onSave({id:Date.now().toString(),name:f.name,department:f.department,position:f.position,joinDate:f.joinDate||new Date().toISOString().split("T")[0],email:f.email,role:f.role,evaluations:[],resume:{education:f.education,certifications:[],skills:f.skills?f.skills.split(",").map(s=>s.trim()).filter(Boolean):[]}});}} style={{flex:1,padding:10,background:"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:700}}>追加</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ============================================================
+// IMPORT MODAL
+// ============================================================
+function ImportModal({onClose,onImport,existing}){
+  const [status,setStatus]=useState("idle");
+  const [errorMsg,setErrorMsg]=useState("");
+  const [preview,setPreview]=useState([]);
+  const [fileName,setFileName]=useState("");
+  const fileRef=useRef();
+  const parseFile=async(file)=>{
+    setStatus("loading");setErrorMsg("");
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array"});
+      let employees=[];
+      for(const sn of wb.SheetNames){
+        const ws=wb.Sheets[sn];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+        const flat=rows.slice(0,5).map(r=>r.join("")).join("");
+        if(flat.includes("評価シート")||flat.includes("氏名")){
+          const p=parseEvalSheet(ws);
+          if(!p.name)continue;
+          const hasEval=p.grade||p.sales||p.qcd||p.team||p.ai||Object.keys(p.selfComp).length>0||Object.keys(p.managerComp).length>0;
+          employees.push({id:Date.now().toString()+Math.random(),name:p.name,department:"未設定",position:POSITIONS.includes(p.position)?p.position:"ME",joinDate:new Date().toISOString().split("T")[0],email:"",role:"",evaluations:hasEval?[{period:new Date().getFullYear()+(new Date().getMonth()<8?"上期":"下期"),grade:p.grade||"",managerGrade:p.grade||"",specialSkillSelf:p.specialSkillSelf,specialSkillManager:p.specialSkillManager,achievements:{sales:p.sales,qcd:p.qcd,team:p.team,ai:p.ai},selfComp:p.selfComp,managerComp:p.managerComp,managerComment:p.managerComment,nextPosition:p.nextPosition,nakaneGrade:"",nakaneComp:{},nakaneComment:"",nakaneNextPos:""}]:[],resume:{education:"",certifications:[],skills:[]}});
+        }else{
+          const hi=rows.findIndex(r=>r.some(c=>/氏名|名前|name/i.test(String(c))));
+          if(hi<0)continue;
+          const hs=rows[hi].map(c=>String(c).trim());
+          const ci=kws=>{const i=hs.findIndex(h=>kws.some(k=>h.includes(k)));return i>=0?i:-1;};
+          const nc=ci(["氏名","名前","name"]),dc=ci(["部署","所属"]),pc=ci(["職位"]),dtc=ci(["入社日"]),ec=ci(["メール","email"]),rc=ci(["役職","職種"]);
+          rows.slice(hi+1).forEach(r=>{const g=i=>i>=0?String(r[i]||"").trim():"";const name=g(nc>=0?nc:0);if(!name)return;const pos=g(pc);employees.push({id:Date.now().toString()+Math.random(),name,department:g(dc)||"未設定",position:POSITIONS.includes(pos)?pos:"ME",joinDate:g(dtc)||new Date().toISOString().split("T")[0],email:g(ec),role:g(rc),evaluations:[],resume:{education:"",certifications:[],skills:[]}});});
+        }
+      }
+      if(!employees.length){setErrorMsg("社員データが読み取れませんでした");setStatus("error");return;}
+      setPreview(employees);setStatus("preview");
+    }catch(e){setErrorMsg("読み込みエラー: "+e.message);setStatus("error");}
+  };
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{background:"#fff",borderRadius:16,padding:28,width:540,maxWidth:"100%",maxHeight:"88vh",overflow:"auto",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{fontWeight:800,fontSize:"1.05rem",color:"#1e293b"}}>📊 Excelインポート</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:"1.4rem",color:"#94a3b8"}}>×</button>
+      </div>
+      {(status==="idle"||status==="error")&&<>
+        <div onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){setFileName(f.name);parseFile(f);}}} onClick={()=>fileRef.current.click()} style={{border:"2px dashed #c7d2fe",borderRadius:12,padding:"36px 20px",textAlign:"center",cursor:"pointer",background:"#f5f7ff",marginBottom:16}}>
+          <div style={{fontSize:"2.2rem",marginBottom:8}}>📂</div>
+          <div style={{fontWeight:700,color:"#4338ca"}}>クリックまたはドラッグ＆ドロップ</div>
+          <div style={{color:"#94a3b8",fontSize:"0.78rem",marginTop:6}}>.xlsx / .xls ファイル</div>
+          {fileName&&<div style={{color:"#22c55e",marginTop:10,fontWeight:600}}>✓ {fileName}</div>}
+        </div>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f){setFileName(f.name);parseFile(f);}}}/>
+        {status==="error"&&<div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:10,padding:12,marginTop:14,fontSize:"0.82rem",color:"#b91c1c"}}>{errorMsg}</div>}
+      </>}
+      {status==="loading"&&<div style={{textAlign:"center",padding:"40px 0",color:"#6366f1"}}><div style={{fontSize:"2rem",marginBottom:10}}>⏳</div><div style={{fontWeight:700}}>読み込み中...</div></div>}
+      {status==="preview"&&<>
+        {(()=>{
+          const newCount=preview.filter(p=>!(existing||[]).some(e=>e.name===p.name)).length;
+          const mergeCount=preview.length-newCount;
+          return <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            {mergeCount>0&&<div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,padding:"6px 12px",fontSize:"0.82rem",color:"#92400e",fontWeight:600}}>🔄 既存社員に追加: {mergeCount}名</div>}
+            {newCount>0&&<div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"6px 12px",fontSize:"0.82rem",color:"#15803d",fontWeight:600}}>✨ 新規登録: {newCount}名</div>}
+          </div>;
+        })()}
+        <div style={{maxHeight:220,overflow:"auto",border:"1.5px solid #e2e8f0",borderRadius:10,marginBottom:12}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
+            <thead><tr style={{background:"#f8fafc",position:"sticky",top:0}}>
+              {["氏名","職位","上司評価","取込結果"].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",color:"#64748b",fontWeight:700,borderBottom:"1px solid #e2e8f0"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{preview.map((emp,i)=>{
+              const ev=emp.evaluations[0];
+              const matched=(existing||[]).find(e=>e.name===emp.name);
+              return <tr key={i} style={{borderBottom:"1px solid #f1f5f9",background:matched?"#fefce8":"#fff"}}>
+                <td style={{padding:"7px 10px",color:"#1e293b",fontWeight:600}}>{emp.name}</td>
+                <td style={{padding:"7px 10px",color:"#374151"}}>{emp.position}</td>
+                <td style={{padding:"7px 10px"}}>{ev?.managerGrade?<GB grade={ev.managerGrade}/>:<span style={{color:"#cbd5e1"}}>-</span>}</td>
+                <td style={{padding:"7px 10px"}}>
+                  {matched
+                    ?<span style={{background:"#fef3c7",color:"#92400e",borderRadius:6,padding:"2px 8px",fontSize:"0.75rem",fontWeight:700}}>🔄 {ev?.period||""}を追加</span>
+                    :<span style={{background:"#dcfce7",color:"#15803d",borderRadius:6,padding:"2px 8px",fontSize:"0.75rem",fontWeight:700}}>✨ 新規</span>}
+                </td>
+              </tr>;
+            })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{fontSize:"0.75rem",color:"#64748b",marginBottom:12,background:"#f8fafc",borderRadius:8,padding:"8px 12px"}}>
+          🔄 既存社員：新しい期の評価を履歴に追加し、職位情報を更新します。<br/>
+          ✨ 新規：社員として新規登録します。
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{setStatus("idle");setPreview([]);}} style={{flex:1,padding:10,border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",color:"#64748b"}}>やり直す</button>
+          <button onClick={()=>{onImport(preview);onClose();}} style={{flex:1,padding:10,background:"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:700}}>取り込む（{preview.length}名）</button>
+        </div>
+      </>}
+    </div>
+  </div>;
+}
+
+// ============================================================
+// EMPLOYEE CARD
+// ============================================================
+function EmployeeCard({emp,onClick,selected}){
+  const latest=emp.evaluations[0];
+  const g=effGrade(latest);
+  return <div onClick={()=>onClick(emp)} style={{background:selected?"#eef2ff":"#fff",border:"1.5px solid "+(selected?"#6366f1":"#e2e8f0"),borderRadius:12,padding:"14px 16px",cursor:"pointer",boxShadow:selected?"0 0 0 3px rgba(99,102,241,0.12)":"0 1px 3px rgba(0,0,0,0.05)"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:"0.97rem",color:"#1e293b"}}>{emp.name}</div>
+        <div style={{marginTop:4}}><DTag dept={emp.department}/></div>
+        <div style={{fontSize:"0.72rem",color:"#64748b",marginTop:4}}>{emp.position} {POSITION_NAMES[emp.position]} · {emp.role||"—"}</div>
+      </div>
+      <div style={{textAlign:"right"}}>
+        {(() => {
+          const dispGrade = latest?.nakaneGrade || latest?.managerGrade || null;
+          return dispGrade
+            ? <GB grade={dispGrade} nakane={!!latest?.nakaneGrade}/>
+            : <span style={{fontSize:"0.72rem",color:"#cbd5e1"}}>未評価</span>;
+        })()}
+        {latest&&<div style={{fontSize:"0.68rem",color:"#94a3b8",marginTop:2}}>{latest.period}</div>}
+        {latest&&latest.managerGrade&&(
+          latest.nakaneGrade
+            ?<div style={{fontSize:"0.65rem",color:"#b45309",marginTop:1}}>上司: {latest.managerGrade}</div>
+            :<div style={{fontSize:"0.65rem",color:"#6366f1",marginTop:1}}>上司: {latest.managerGrade}</div>
+        )}
+      </div>
+    </div>
+  </div>;
+}
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function App(){
+  const [employees,setEmployees]=useState(()=>{try{const s=localStorage.getItem(STORAGE_KEY);return s?JSON.parse(s):SAMPLE;}catch{return SAMPLE;}});
+  const [selected,setSelected]=useState(null);
+  const [view,setView]=useState("list");
+  const [search,setSearch]=useState("");
+  const [deptFilter,setDeptFilter]=useState("all");
+  const [modal,setModal]=useState(null);
+  const [saveMsg,setSaveMsg]=useState("");
+  const loadJsonRef=useRef();
+
+  useEffect(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(employees));}catch(e){}},[employees]);
+
+  const filtered=employees.filter(e=>{
+    const q=search.toLowerCase();
+    return(!q||e.name.includes(q)||e.department.toLowerCase().includes(q)||(e.role||"").toLowerCase().includes(q))&&(deptFilter==="all"||e.department===deptFilter);
+  });
+  const toast=(msg)=>{setSaveMsg(msg);setTimeout(()=>setSaveMsg(""),2500);};
+  const updateProfile=(updated)=>{setEmployees(p=>p.map(e=>e.id===updated.id?updated:e));setSelected(updated);};
+  const editEval=(empId,evalIdx,updated)=>{setEmployees(p=>p.map(e=>{if(e.id!==empId)return e;const evs=[...e.evaluations];evs[evalIdx]=updated;const up={...e,evaluations:evs};if(selected?.id===empId)setSelected(up);return up;}));};
+  const addEval=ev=>{setEmployees(p=>p.map(e=>{if(e.id!==selected.id)return e;const up={...e,evaluations:[ev,...e.evaluations]};setSelected(up);return up;}));setModal(null);};
+  const deleteEmployee=id=>{setEmployees(p=>p.filter(e=>e.id!==id));setSelected(null);};
+  const handleSaveJson=()=>{try{const blob=new Blob([JSON.stringify(employees,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="talent_data_"+new Date().toISOString().split("T")[0]+".json";a.click();URL.revokeObjectURL(url);toast("💾 JSONを保存しました");}catch(e){toast("❌ 失敗: "+e.message);}};
+  const handleLoadFile=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(Array.isArray(data)){setEmployees(data);toast("✅ データを読み込みました");}else toast("❌ 形式が正しくありません");}catch{toast("❌ 読み込みに失敗しました");};};reader.readAsText(file);e.target.value="";};
+  const handleExport=()=>{try{exportToExcel(employees);toast("📊 Excelを出力しました");}catch(e){toast("❌ 出力失敗: "+e.message);}};
+
+  return <div style={{minHeight:"100vh",background:"#f1f5f9"}}>
+    <div style={{background:"linear-gradient(135deg,#1e1b4b,#4338ca)",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(0,0,0,0.25)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:"1.3rem"}}>👥</span>
+        <span style={{color:"#fff",fontWeight:800,fontSize:"1rem"}}>タレントマネジメント</span>
+      </div>
+      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+        {[{id:"list",label:"社員一覧"},{id:"dashboard",label:"ダッシュボード"}].map(v=>(
+          <button key={v.id} onClick={()=>{setView(v.id);setSelected(null);}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:view===v.id?"rgba(255,255,255,0.22)":"transparent",color:"#fff",fontWeight:view===v.id?700:400,fontSize:"0.82rem"}}>{v.label}</button>
+        ))}
+        <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",margin:"0 4px"}}/>
+        <button onClick={handleSaveJson} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:"0.78rem"}}>⬇ JSON保存</button>
+        <button onClick={()=>loadJsonRef.current.click()} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:"0.78rem"}}>⬆ JSON読込</button>
+        <button onClick={handleExport} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(255,220,0,0.5)",background:"rgba(255,220,0,0.2)",color:"#fff",fontSize:"0.78rem",fontWeight:700}}>📊 Excel出力</button>
+        <input ref={loadJsonRef} type="file" accept=".json" style={{display:"none"}} onChange={handleLoadFile}/>
+      </div>
+    </div>
+    {saveMsg&&<div style={{position:"fixed",top:66,right:16,background:"#1e293b",color:"#fff",padding:"8px 16px",borderRadius:8,zIndex:500,fontSize:"0.85rem",fontWeight:600,boxShadow:"0 4px 12px rgba(0,0,0,0.2)"}}>{saveMsg}</div>}
+    <div style={{maxWidth:1060,margin:"0 auto",padding:"20px 14px"}}>
+      {view==="dashboard"?(
+        <Dashboard employees={employees}/>
+      ):selected?(
+        <EmployeeDetail emp={selected} onBack={()=>setSelected(null)} onAddEval={()=>setModal("addEval")} onEdit={(evalIdx,updated)=>editEval(selected.id,evalIdx,updated)} onDelete={deleteEmployee} onUpdateProfile={updateProfile} employees={employees}/>
+      ):(
+        <div>
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 名前・部署・役職で検索..." style={{flex:"1 1 180px",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",background:"#fff",fontSize:"0.85rem"}}/>
+            <select value={deptFilter} onChange={e=>setDeptFilter(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",background:"#fff",fontSize:"0.85rem"}}>
+              <option value="all">全部署</option>{DEPARTMENTS.map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+            <button onClick={()=>setModal("import")} style={{padding:"8px 14px",background:"#fff",border:"1.5px solid #6366f1",color:"#6366f1",borderRadius:8,fontWeight:700,fontSize:"0.82rem"}}>📊 Excel取込</button>
+            <button onClick={()=>setModal("addEmp")} style={{padding:"8px 14px",background:"#6366f1",color:"#fff",border:"none",borderRadius:8,fontWeight:700,fontSize:"0.82rem"}}>＋ 社員追加</button>
+          </div>
+          <div style={{fontSize:"0.78rem",color:"#94a3b8",marginBottom:10}}>{filtered.length}名表示</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
+            {filtered.map(emp=><EmployeeCard key={emp.id} emp={emp} onClick={setSelected} selected={selected?.id===emp.id}/>)}
+            {filtered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:40,color:"#94a3b8"}}>社員が見つかりません</div>}
+          </div>
+        </div>
+      )}
+    </div>
+    {modal==="addEval"&&selected&&<AddEvalModal emp={selected} onClose={()=>setModal(null)} onSave={addEval}/>}
+    {modal==="addEmp"&&<AddEmployeeModal onClose={()=>setModal(null)} onSave={emp=>{setEmployees(p=>[...p,emp]);setModal(null);}}/>}
+    {modal==="import"&&<ImportModal
+        onClose={()=>setModal(null)}
+        existing={employees}
+        onImport={incoming=>{
+          setEmployees(prev=>{
+            const result=[...prev];
+            incoming.forEach(inc=>{
+              // 氏名＋部署で既存社員を検索（部署が「未設定」の場合は氏名のみ）
+              const idx=result.findIndex(e=>e.name===inc.name&&(inc.department==="未設定"||e.department===inc.department||e.name===inc.name));
+              if(idx>=0){
+                // 既存社員に評価を追加（同じperiodが既にある場合はスキップ）
+                const existing=result[idx];
+                const newEvals=inc.evaluations.filter(nev=>
+                  !existing.evaluations.some(ev=>ev.period===nev.period)
+                );
+                if(newEvals.length>0){
+                  result[idx]={
+                    ...existing,
+                    // 職位は取込データで更新（部署が未設定でなければ部署も更新）
+                    position:inc.position||existing.position,
+                    department:inc.department!=="未設定"?inc.department:existing.department,
+                    // 評価は新しい順に並べる（新→古）
+                    evaluations:[...newEvals,...existing.evaluations],
+                  };
+                }
+              }else{
+                // 新規社員として追加
+                result.push(inc);
+              }
+            });
+            return result;
+          });
+        }}
+      />}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
